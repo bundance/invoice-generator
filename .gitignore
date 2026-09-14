@@ -1,0 +1,20 @@
+node_modules/
+.pnpm-store/
+dist/
+dist-electron/
+release/
+test-results/
+playwright-report/
+*.tsbuildinfo
+*.log
+.DS_Store
+.osgrep/
+.vite/
+.vite-hooks/_/
+.codex/pstack-state/verify-invoice-generator/
+
+# Generated invoice artifacts and local scratch output
+docs/Codernetic-invoice-GGIOHK-0043.docx
+docs/Codernetic-invoice-GGIOHK-0043.pdf
+output/pdf/
+tmp/

@@ -1,0 +1,47 @@
+.launch-state {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  align-content: center;
+  padding: 48px;
+  background: #eef0eb;
+}
+
+.launch-state--error {
+  text-align: center;
+}
+
+.launch-state--error > svg {
+  width: 42px;
+  height: 42px;
+  margin-bottom: 20px;
+  color: var(--accent-dark);
+}
+
+.launch-state--error p {
+  color: var(--muted);
+}
+
+.recovery-screen {
+  grid-template-columns: minmax(0, 560px);
+}
+
+.launch-state--error .recovery-screen__eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent-dark);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.recovery-screen__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.recovery-screen__status {
+  min-height: 1.5em;
+}

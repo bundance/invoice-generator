@@ -1,0 +1,21 @@
+appId: com.codernetic.invoicegenerator
+productName: Invoice Generator
+asar: true
+directories:
+  output: release
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  identity: "-"
+  hardenedRuntime: false
+  minimumSystemVersion: "26.0"
+  notarize: false
+dmg:
+  sign: false
+  writeUpdateInfo: false

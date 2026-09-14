@@ -1,0 +1,135 @@
+.app-shell {
+  display: grid;
+  min-height: 100vh;
+  grid-template-rows: 68px minmax(0, 1fr);
+  background: #e8ebe6;
+}
+
+.top-bar {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  display: grid;
+  height: 68px;
+  grid-template-columns: 200px 1fr 180px;
+  align-items: center;
+  padding: 0 24px;
+  border-bottom: 1px solid #d2d6d0;
+  color: var(--ink);
+  background: #fffefa;
+}
+
+.wordmark,
+.paper-wordmark {
+  color: #26312b;
+  font-family: "Arial Narrow", sans-serif;
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: -0.08em;
+}
+
+.wordmark {
+  display: flex;
+  align-items: baseline;
+}
+
+.wordmark strong,
+.paper-wordmark strong {
+  color: #e47b3a;
+}
+
+.wordmark small {
+  margin-left: 10px;
+  color: #7c847e;
+  font-family: inherit;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.top-bar nav {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.destination {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 9px;
+  padding: 8px 12px;
+  color: #5e675f;
+  background: transparent;
+  text-align: left;
+}
+
+.destination svg {
+  width: 17px;
+  height: 17px;
+}
+
+.destination:hover {
+  color: var(--ink);
+  background: #f1f3ef;
+}
+
+.destination[aria-current="page"] {
+  color: var(--ink);
+  background: #e5e9e3;
+}
+
+.local-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  justify-self: end;
+  margin: 0;
+  color: #687169;
+  font-size: 0.75rem;
+}
+
+.local-status span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6dc79a;
+  box-shadow: 0 0 0 4px rgb(109 199 154 / 12%);
+}
+
+.workspace {
+  min-width: 0;
+  padding: 34px 38px 80px;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-header h1,
+.launch-state h1 {
+  margin-bottom: 8px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.25rem, 4vw, 3.4rem);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
+.page-header > p:last-child {
+  max-width: 720px;
+  margin-bottom: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.eyebrow {
+  margin-bottom: 7px;
+  color: var(--accent-dark);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}

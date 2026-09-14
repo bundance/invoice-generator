@@ -1,0 +1,300 @@
+* {
+  box-sizing: border-box;
+}
+
+.pdf-page {
+  position: relative;
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  padding: 25.4mm;
+  color: #111;
+  background: #fff;
+  font-family: "Arimo";
+  font-synthesis: none;
+  font-size: 10.5pt;
+  line-height: 1.2;
+}
+
+.document-header,
+.document-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14mm;
+}
+
+.document-logo {
+  width: 44.2mm;
+  height: auto;
+}
+
+.invoice-document address {
+  max-width: 70mm;
+  max-height: 31mm;
+  margin: 0;
+  overflow: hidden;
+  font-style: normal;
+  line-height: 1.42;
+  white-space: pre-line;
+  text-align: right;
+}
+
+.document-meta {
+  margin-top: 22mm;
+  line-height: 1.42;
+}
+
+.invoice-document:has(.credit-note-link) .document-meta {
+  margin-top: 4mm;
+}
+
+.client-address {
+  white-space: pre-line;
+}
+
+.document-meta-copy {
+  min-width: 0;
+  max-width: 72mm;
+}
+
+.document-recipient {
+  max-height: 32mm;
+  overflow: hidden;
+}
+
+.document-title {
+  min-width: 67mm;
+  text-align: right;
+}
+
+.document-title h2 {
+  overflow: hidden;
+  margin: 0;
+  font-size: 13pt;
+  line-height: 1.22;
+  white-space: nowrap;
+}
+
+.document-title [data-fit-region="issue-date"],
+.document-footer [data-fit-region="payment-terms"] {
+  display: block;
+  overflow: hidden;
+}
+
+.document-title strong,
+.document-title small {
+  display: block;
+  margin-top: 2.2mm;
+}
+
+.document-title small {
+  color: #5c5852;
+  font-size: 8pt;
+}
+
+.document-table {
+  width: 100%;
+  margin-top: 12mm;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 9pt;
+}
+
+.credit-note-link,
+.credit-note-reason {
+  display: grid;
+  gap: 1.5mm;
+  overflow: hidden;
+  font-size: 8.7pt;
+}
+
+.credit-note-link {
+  height: 14mm;
+  margin-top: 3mm;
+  padding: 2.5mm 3mm;
+  border: 0.35mm solid #b9c6bd;
+  background: #f4f7f4;
+}
+
+.credit-note-link + .document-table {
+  margin-top: 3mm;
+}
+
+.credit-note-reason {
+  height: 12mm;
+  padding-top: 3mm;
+  white-space: pre-line;
+}
+
+.credit-note-link span,
+.credit-note-reason span {
+  color: #5c5852;
+  font-size: 7.5pt;
+  text-transform: uppercase;
+}
+
+.invoice-document:has(.credit-note-link) .service-row {
+  height: 48mm;
+}
+
+.invoice-document:has(.credit-note-link) .service-copy {
+  height: 38mm;
+}
+
+.document-table th,
+.document-table td {
+  padding: 2.3mm 2mm;
+  border: 0.35mm solid #222;
+  vertical-align: top;
+}
+
+.document-value {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.document-table thead {
+  background: #d0d0d0;
+  font-size: 9pt;
+  text-align: center;
+}
+
+.document-table th:nth-child(1) {
+  width: 38%;
+}
+
+.document-table th:nth-child(2) {
+  width: 10%;
+}
+
+.document-table th:nth-child(3) {
+  width: 20%;
+}
+
+.document-table th:nth-child(4) {
+  width: 18%;
+}
+
+.document-table th:nth-child(5) {
+  width: 14%;
+}
+
+.service-row {
+  height: 61mm;
+  line-height: 1.38;
+}
+
+.service-copy {
+  height: 55mm;
+  overflow: hidden;
+  white-space: pre-line;
+}
+
+.invoice-document--sterling-vat .service-row {
+  height: 41mm;
+}
+
+.invoice-document--sterling-vat .service-copy {
+  height: 35mm;
+}
+
+.invoice-document--sterling-vat:has(.credit-note-link) .service-row {
+  height: 40mm;
+}
+
+.invoice-document--sterling-vat:has(.credit-note-link) .service-copy {
+  height: 35mm;
+}
+
+.invoice-document--sterling-vat .document-notes {
+  height: 15mm;
+  padding-top: 3mm;
+}
+
+.totals-label,
+.total-row {
+  font-weight: 700;
+}
+
+.total-row {
+  background: #d0d0d0;
+}
+
+.document-notes {
+  height: 20mm;
+  overflow: hidden;
+  padding-top: 4mm;
+  font-size: 8.7pt;
+  line-height: 1.4;
+}
+
+.document-sterling-vat {
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px solid #b9c6bd;
+  background: #f4f7f4;
+  font-size: 10px;
+}
+
+.document-sterling-vat h3,
+.document-sterling-vat p,
+.document-sterling-vat dl {
+  margin: 0;
+}
+
+.document-sterling-vat h3 {
+  margin-bottom: 7px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.document-sterling-vat dl {
+  display: flex;
+  gap: 24px;
+}
+
+.document-sterling-vat dl div {
+  display: flex;
+  gap: 5px;
+}
+
+.document-sterling-vat dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.document-sterling-vat p {
+  margin-top: 5px;
+}
+
+.document-sterling-vat__evidence {
+  white-space: pre-line;
+}
+
+.document-notes p {
+  margin: 0 0 1.5mm;
+  white-space: pre-line;
+}
+
+.document-footer {
+  margin-top: 3mm;
+  text-align: center;
+  font-size: 8.7pt;
+  line-height: 1.45;
+}
+
+@page {
+  size: A4;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    background: #fff;
+  }
+}

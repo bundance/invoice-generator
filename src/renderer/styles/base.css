@@ -1,0 +1,40 @@
+body {
+  min-width: 900px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button {
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--focus) 80%, white);
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  color: inherit;
+  font: inherit;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--focus);
+  outline: 2px solid color-mix(in srgb, var(--focus) 28%, transparent);
+  outline-offset: 1px;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+.sterling-vat-facts__evidence {
+  white-space: pre-line;
+}

@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF rendering proof</title>
+    <style>
+      :root {
+        color: #22201d;
+        background: #e8e4dc;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        font-synthesis: none;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      button {
+        font: inherit;
+      }
+      button:focus-visible {
+        outline: 3px solid #2978a0;
+        outline-offset: 2px;
+      }
+
+      .prototype-shell {
+        display: grid;
+        grid-template-columns: minmax(330px, 0.72fr) minmax(700px, 1.28fr);
+        min-height: 100vh;
+      }
+
+      .control-panel {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow: auto;
+        padding: 32px;
+        border-right: 1px solid #c9c2b6;
+        background: #f8f5ef;
+      }
+
+      .eyebrow {
+        margin: 0 0 7px;
+        color: #95502d;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font:
+          600 31px/1.12 Georgia,
+          serif;
+      }
+      .intro {
+        margin: 14px 0 26px;
+        color: #5f5a53;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+      .panel-title {
+        margin: 0 0 13px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .state-card,
+      .walkthrough-card {
+        margin-top: 20px;
+        padding: 18px;
+        border: 1px solid #d4cdc1;
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      .state-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 13px;
+        margin: 0;
+      }
+      .state-grid div {
+        min-width: 0;
+      }
+      dt {
+        color: #777169;
+        font-size: 10px;
+        font-weight: 750;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      dd {
+        overflow-wrap: anywhere;
+        margin: 4px 0 0;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .status-message {
+        margin: 15px 0 0;
+        padding: 11px 12px;
+        border-left: 3px solid #377157;
+        color: #2c5b47;
+        background: #eef6f1;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .button {
+        min-height: 44px;
+        padding: 8px 12px;
+        border: 1px solid #b9afa1;
+        border-radius: 7px;
+        color: #322f2a;
+        background: #fff;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 750;
+      }
+      .button:hover {
+        border-color: #95502d;
+      }
+      .button--primary {
+        border-color: #95502d;
+        color: #fff;
+        background: #95502d;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 13px;
+      }
+      .tab {
+        flex: 1;
+        padding: 8px 5px;
+        border: 0;
+        border-bottom: 2px solid #d8d1c6;
+        color: #746e65;
+        background: transparent;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .tab[aria-pressed="true"] {
+        border-color: #95502d;
+        color: #71391f;
+        font-weight: 800;
+      }
+      .walkthrough-description {
+        min-height: 54px;
+        margin: 0 0 13px;
+        color: #5f5a53;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .step-list {
+        display: grid;
+        gap: 7px;
+      }
+      .step-list .button {
+        text-align: left;
+      }
+
+      .preview-area {
+        min-width: 0;
+        padding: 26px;
+        overflow: hidden;
+      }
+      .preview-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        max-width: 790px;
+        margin: 0 auto 12px;
+        color: #5f5a53;
+        font-size: 12px;
+      }
+      .preview-toolbar strong {
+        color: #2d2a26;
+      }
+      .paper-viewport {
+        display: flex;
+        justify-content: center;
+        max-width: 840px;
+        margin: 0 auto;
+        overflow: hidden;
+      }
+      .paper-scale {
+        width: 210mm;
+        height: calc(297mm * 0.67);
+        transform: scale(0.67);
+        transform-origin: top center;
+      }
+
+      .pdf-page {
+        position: relative;
+        width: 210mm;
+        height: 297mm;
+        overflow: hidden;
+        padding: 25.4mm;
+        color: #111;
+        background: #fff;
+        box-shadow: 0 18px 45px rgb(48 42 34 / 18%);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 10.5pt;
+      }
+
+      .document-header,
+      .document-meta {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14mm;
+      }
+      .document-logo {
+        width: 44.2mm;
+        height: auto;
+      }
+      address {
+        font-style: normal;
+        line-height: 1.42;
+        text-align: right;
+      }
+
+      .document-meta {
+        margin-top: 22mm;
+        line-height: 1.42;
+      }
+      .document-title {
+        min-width: 67mm;
+        text-align: right;
+      }
+      .document-title h2 {
+        margin: 0;
+        font-size: 13pt;
+        line-height: 1.22;
+      }
+      .document-title strong {
+        display: block;
+        margin-top: 2.2mm;
+        font-size: 11.5pt;
+      }
+      .document-title small {
+        display: block;
+        margin-top: 2mm;
+        color: #5c5852;
+        font-size: 8pt;
+      }
+
+      .document-table {
+        width: 100%;
+        margin-top: 12mm;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 9pt;
+      }
+      .document-table th,
+      .document-table td {
+        padding: 2.3mm 2mm;
+        border: 0.35mm solid #222;
+        vertical-align: top;
+      }
+      .document-table thead {
+        background: #d0d0d0;
+        font-size: 9pt;
+        text-align: center;
+      }
+      .document-table th:nth-child(1) {
+        width: 39%;
+      }
+      .document-table th:nth-child(2) {
+        width: 13%;
+      }
+      .document-table th:nth-child(3) {
+        width: 20%;
+      }
+      .document-table th:nth-child(4) {
+        width: 14%;
+      }
+      .service-row {
+        height: 68mm;
+        line-height: 1.38;
+      }
+      .service-copy {
+        height: 58mm;
+        overflow: hidden;
+      }
+      .totals-label {
+        font-weight: 800;
+      }
+      .total-row {
+        background: #d0d0d0;
+        font-weight: 800;
+      }
+
+      .document-footer {
+        margin-top: 6mm;
+        text-align: center;
+        font-size: 8.7pt;
+        line-height: 1.45;
+      }
+      .credit-context {
+        margin-top: 6mm;
+        padding: 3.5mm 4mm;
+        background: #f0ede8;
+        line-height: 1.42;
+      }
+      .credit-context strong {
+        display: block;
+        margin-top: 1mm;
+      }
+      .credit-reason {
+        margin-top: 5mm;
+        padding-top: 4mm;
+        border-top: 0.35mm solid #999;
+        line-height: 1.42;
+      }
+      .credit-reason span {
+        display: block;
+        margin-bottom: 1.5mm;
+        font-size: 8pt;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .overflow-copy {
+        display: none;
+      }
+      .stress-fit .normal-copy {
+        display: none;
+      }
+      .stress-fit .overflow-copy {
+        display: inline;
+      }
+
+      .export-only {
+        display: none;
+      }
+
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      @media print {
+        html,
+        body {
+          width: 210mm;
+          height: 297mm;
+          background: #fff;
+        }
+        .prototype-shell {
+          display: block;
+          min-height: 0;
+        }
+        .control-panel,
+        .preview-toolbar {
+          display: none;
+        }
+        .preview-area,
+        .paper-viewport,
+        .paper-scale {
+          width: 210mm;
+          height: 297mm;
+          margin: 0;
+          padding: 0;
+          overflow: visible;
+        }
+        .paper-scale {
+          transform: none;
+        }
+        .pdf-page {
+          box-shadow: none;
+          break-after: avoid;
+        }
+      }
+
+      body[data-export="true"] {
+        width: 210mm;
+        height: 297mm;
+        background: #fff;
+      }
+      body[data-export="true"] .control-panel,
+      body[data-export="true"] .preview-toolbar {
+        display: none;
+      }
+      body[data-export="true"] .prototype-shell {
+        display: block;
+        min-height: 0;
+      }
+      body[data-export="true"] .preview-area,
+      body[data-export="true"] .paper-viewport,
+      body[data-export="true"] .paper-scale {
+        width: 210mm;
+        height: 297mm;
+        margin: 0;
+        padding: 0;
+        overflow: visible;
+      }
+      body[data-export="true"] .paper-scale {
+        transform: none;
+      }
+      body[data-export="true"] .pdf-page {
+        box-shadow: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="prototype-shell">
+      <aside class="control-panel">
+        <p class="eyebrow">Throwaway rendering proof</p>
+        <h1>One document, previewed and exported</h1>
+        <p class="intro">
+          This prototype checks whether one fixed A4 HTML/CSS document can render the invoice and
+          full credit note on screen, export through Electron without a second template, and reject
+          content that does not fit.
+        </p>
+
+        <section class="state-card" aria-labelledby="state-title">
+          <h2 class="panel-title" id="state-title">Current document state</h2>
+          <dl class="state-grid" id="state-grid"></dl>
+          <p class="status-message" id="status-message" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="state-card" aria-labelledby="free-play-title">
+          <h2 class="panel-title" id="free-play-title">Free play</h2>
+          <div class="button-row">
+            <button class="button" type="button" data-action="select-invoice">
+              Preview invoice
+            </button>
+            <button class="button" type="button" data-action="select-credit-note">
+              Preview credit note
+            </button>
+            <button class="button" type="button" data-action="toggle-stress">
+              Toggle overflow case
+            </button>
+            <button class="button button--primary" type="button" data-action="export">
+              Export selected PDF
+            </button>
+          </div>
+        </section>
+
+        <section class="walkthrough-card" aria-labelledby="walkthrough-title">
+          <h2 class="panel-title" id="walkthrough-title">Guided checks</h2>
+          <div class="tabs" role="group" aria-label="Rendering checks">
+            <button class="tab" type="button" data-scenario="invoice">Invoice</button>
+            <button class="tab" type="button" data-scenario="creditNote">Credit note</button>
+            <button class="tab" type="button" data-scenario="overflow">Overflow</button>
+          </div>
+          <p class="walkthrough-description" id="walkthrough-description"></p>
+          <div class="step-list" id="step-list"></div>
+        </section>
+      </aside>
+
+      <section class="preview-area" aria-label="Shared preview and export document">
+        <header class="preview-toolbar">
+          <strong id="preview-label"></strong><span>Scaled preview of one A4 page</span>
+        </header>
+        <div class="paper-viewport"><div class="paper-scale" id="document-host"></div></div>
+      </section>
+    </main>
+
+    <script>
+      const DOCUMENTS = Object.freeze({
+        invoice: Object.freeze({
+          kind: "invoice",
+          id: "GGIOHK-0043",
+          filename: "GGIOHK-0043.pdf",
+          title: "INVOICE GGIOHK-0043",
+          issueDate: "27 December 2025",
+          quantity: "2 days",
+          rate: "$725 per day",
+          net: "$1,450.00",
+          vat: "$0.00",
+          total: "$1,450.00",
+          description:
+            "React Native Development Consultancy. Work done for Input Output Lace app project.",
+          footer: "Outside the scope of UK VAT. All amounts are shown in US dollars.",
+        }),
+        creditNote: Object.freeze({
+          kind: "creditNote",
+          id: "CN-GGIOHK-0043",
+          filename: "CN-GGIOHK-0043.pdf",
+          title: "CREDIT NOTE CN-GGIOHK-0043",
+          issueDate: "2 September 2026",
+          quantity: "-2 days",
+          rate: "$725 per day",
+          net: "-$1,450.00",
+          vat: "$0.00",
+          total: "-$1,450.00",
+          description: "Full reversal of invoice GGIOHK-0043.",
+          footer: "Outside the scope of UK VAT. Original tax facts preserved.",
+          originalInvoiceId: "GGIOHK-0043",
+          originalIssueDate: "27 December 2025",
+          reason: "The billed service period was incorrect.",
+        }),
+      });
+
+      const SCENARIOS = Object.freeze({
+        invoice: Object.freeze({
+          description:
+            "Confirm that the fixed reference layout, exact wordmark, structured facts, and proposed invoice filename all come from the same render model.",
+          steps: Object.freeze([
+            ["Show the issued invoice", "select-invoice"],
+            ["Export GGIOHK-0043.pdf", "export"],
+          ]),
+        }),
+        creditNote: Object.freeze({
+          description:
+            "Switch document kind without switching renderer. The shared page adapts its title, linked-document facts, negative totals, reason, and filename.",
+          steps: Object.freeze([
+            ["Show the full credit note", "select-credit-note"],
+            ["Export CN-GGIOHK-0043.pdf", "export"],
+          ]),
+        }),
+        overflow: Object.freeze({
+          description:
+            "Replace the service description with content that exceeds its fixed region. The measured fit check must block export instead of clipping text.",
+          steps: Object.freeze([
+            ["Show the invoice", "select-invoice"],
+            ["Insert overflowing content", "enable-stress"],
+            ["Try to export", "export"],
+            ["Restore fitting content", "disable-stress"],
+          ]),
+        }),
+      });
+
+      const initialDocumentKind =
+        new URL(location.href).searchParams.get("document") === "creditNote"
+          ? "creditNote"
+          : "invoice";
+      const initialState = Object.freeze({
+        documentKind: initialDocumentKind,
+        scenario: "invoice",
+        stressFit: new URL(location.href).searchParams.get("stress") === "true",
+        exportStatus: "Not exported",
+        lastEvent: "Loaded the shared renderer",
+      });
+
+      function reduce(state, action) {
+        switch (action.type) {
+          case "selectDocument":
+            return {
+              ...state,
+              documentKind: action.documentKind,
+              stressFit: false,
+              lastEvent: `Selected ${action.documentKind === "invoice" ? "invoice" : "credit note"}`,
+            };
+          case "selectScenario":
+            return {
+              ...initialState,
+              scenario: action.scenario,
+              documentKind: action.scenario === "creditNote" ? "creditNote" : "invoice",
+              lastEvent: `Started ${action.scenario} walkthrough`,
+            };
+          case "setStressFit":
+            return {
+              ...state,
+              stressFit: action.enabled,
+              lastEvent: action.enabled
+                ? "Inserted overflowing service text"
+                : "Restored fitting service text",
+            };
+          case "exportStarted":
+            return { ...state, exportStatus: "Checking layout", lastEvent: "Requested PDF export" };
+          case "exportBlocked":
+            return { ...state, exportStatus: "Blocked by fit check", lastEvent: action.message };
+          case "exportCompleted":
+            return {
+              ...state,
+              exportStatus: action.outputPath,
+              lastEvent: `Exported ${DOCUMENTS[state.documentKind].filename}`,
+            };
+          case "exportUnavailable":
+            return {
+              ...state,
+              exportStatus: "Open in Electron to export",
+              lastEvent: "The browser preview uses the same document but cannot write a PDF",
+            };
+          default:
+            throw new TypeError(`Unknown action: ${action.type}`);
+        }
+      }
+
+      function renderDocument(document, stressFit) {
+        const creditContext =
+          document.kind === "creditNote"
+            ? `<section class="credit-context" data-fit-region="original-invoice-reference"><span>Credit for Genesis Global</span><strong>References invoice ${document.originalInvoiceId}, issued ${document.originalIssueDate}</strong></section>`
+            : "";
+        const reason =
+          document.kind === "creditNote"
+            ? `<section class="credit-reason" data-fit-region="correction-reason"><span>Correction reason</span><strong>${document.reason}</strong></section>`
+            : "";
+        const description = stressFit
+          ? `<span class="overflow-copy">${"This deliberately overlong service description proves that renderer-fit validation measures the fixed table cell before issue and refuses to create a clipped PDF. ".repeat(22)}</span>`
+          : `<span class="normal-copy">${document.description}</span>`;
+
+        return `
+          <article class="pdf-page ${stressFit ? "stress-fit" : ""}" aria-label="${document.kind === "invoice" ? "Invoice" : "Credit note"} A4 document">
+            <header class="document-header" data-fit-region="header">
+              <img class="document-logo" src="assets/codernetic-wordmark.png" alt="Codernetic" />
+              <address><strong>Codernetic Ltd</strong><br />7 Coley Hill<br />Reading<br />Berkshire<br />RG1 6AE</address>
+            </header>
+            <section class="document-meta" data-fit-region="document-meta">
+              <div><em>Bacs details:</em><br />HSBC<br />Account Number: 54575059<br />Sort Code: 40-38-04<br /><br /><strong>${document.kind === "invoice" ? "Invoice to:" : "Credit note to:"}</strong><br />Genesis Global</div>
+              <div class="document-title"><h2>${document.title}</h2><strong>${document.issueDate}</strong>${document.kind === "creditNote" ? `<small>Full credit of ${document.originalInvoiceId}</small>` : ""}</div>
+            </section>
+            ${creditContext}
+            <table class="document-table" aria-label="Service and totals">
+              <thead><tr><th>Description</th><th>Qty</th><th>Rate</th><th>Net Cost</th><th>VAT</th></tr></thead>
+              <tbody>
+                <tr class="service-row"><td><div class="service-copy" data-fit-region="service-description">${description}<br /><br /><em>Invoice Period:</em><br /><br />21 December 2025 -<br />27 December 2025</div></td><td>${document.quantity}</td><td>${document.rate}</td><td>${document.net}</td><td>${document.vat}</td></tr>
+                <tr><td></td><td></td><td class="totals-label">SUBTOTALS</td><td>${document.net}</td><td>${document.vat}</td></tr>
+                <tr class="total-row"><td></td><td></td><td>TOTAL</td><td colspan="2">${document.total} USD</td></tr>
+              </tbody>
+            </table>
+            ${reason}
+            <footer class="document-footer" data-fit-region="footer">${document.footer}<br />VAT Registration Number 388 8021 60<br />Company Reg. No. 8822243</footer>
+          </article>`;
+      }
+
+      function getFitFailures() {
+        return getFitMeasurements()
+          .filter(
+            (region) =>
+              region.scrollHeight > region.clientHeight + 2 ||
+              region.scrollWidth > region.clientWidth + 2,
+          )
+          .map((region) => region.name);
+      }
+
+      function getFitMeasurements() {
+        return [...document.querySelectorAll("[data-fit-region]")].map((element) => ({
+          name: element.dataset.fitRegion,
+          clientHeight: element.clientHeight,
+          scrollHeight: element.scrollHeight,
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+        }));
+      }
+
+      function verifyDocument() {
+        const documentState = DOCUMENTS[state.documentKind];
+        const page = document.querySelector(".pdf-page");
+        const logo = document.querySelector(".document-logo");
+        return {
+          documentKind: state.documentKind,
+          documentId: documentState.id,
+          filename: documentState.filename,
+          pageWidth: page?.clientWidth ?? 0,
+          pageHeight: page?.clientHeight ?? 0,
+          logoLoaded:
+            logo instanceof HTMLImageElement &&
+            logo.complete &&
+            logo.naturalWidth === 334 &&
+            logo.naturalHeight === 72,
+          fitFailures: getFitFailures(),
+          fitMeasurements: getFitMeasurements(),
+        };
+      }
+
+      let state = initialState;
+
+      function render() {
+        const documentState = DOCUMENTS[state.documentKind];
+        document.querySelector("#document-host").innerHTML = renderDocument(
+          documentState,
+          state.stressFit,
+        );
+        document.querySelector("#preview-label").textContent =
+          `${documentState.id} · ${documentState.filename}`;
+        document.querySelector("#state-grid").innerHTML = `
+          <div><dt>Document</dt><dd>${documentState.kind === "invoice" ? "Issued invoice" : "Full credit note"}</dd></div>
+          <div><dt>Identifier</dt><dd>${documentState.id}</dd></div>
+          <div><dt>Retained filename</dt><dd>${documentState.filename}</dd></div>
+          <div><dt>Render model</dt><dd>Shared A4 HTML/CSS</dd></div>
+          <div><dt>Fit check</dt><dd>${getFitFailures().length === 0 ? "Pass" : "Blocked"}</dd></div>
+          <div><dt>Export</dt><dd>${state.exportStatus}</dd></div>`;
+        document.querySelector("#status-message").textContent = state.lastEvent;
+
+        for (const tab of document.querySelectorAll("[data-scenario]")) {
+          const selected = tab.dataset.scenario === state.scenario;
+          tab.setAttribute("aria-pressed", String(selected));
+        }
+
+        const scenario = SCENARIOS[state.scenario];
+        document.querySelector("#walkthrough-description").textContent = scenario.description;
+        document.querySelector("#step-list").innerHTML = scenario.steps
+          .map(
+            ([label, action]) =>
+              `<button class="button" type="button" data-action="${action}">${label}</button>`,
+          )
+          .join("");
+      }
+
+      async function exportSelectedDocument() {
+        state = reduce(state, { type: "exportStarted" });
+        render();
+        const fitFailures = getFitFailures();
+        if (fitFailures.length > 0) {
+          state = reduce(state, {
+            type: "exportBlocked",
+            message: `Export blocked. Content exceeds: ${fitFailures.join(", ")}`,
+          });
+          render();
+          return;
+        }
+
+        if (!window.invoicePdfPrototype) {
+          state = reduce(state, { type: "exportUnavailable" });
+          render();
+          return;
+        }
+
+        try {
+          const result = await window.invoicePdfPrototype.exportDocument(state.documentKind);
+          state = reduce(state, { type: "exportCompleted", outputPath: result.outputPath });
+        } catch (error) {
+          state = reduce(state, {
+            type: "exportBlocked",
+            message: error instanceof Error ? error.message : "PDF export failed",
+          });
+        }
+        render();
+      }
+
+      function dispatchAction(action) {
+        switch (action) {
+          case "select-invoice":
+            state = reduce(state, { type: "selectDocument", documentKind: "invoice" });
+            break;
+          case "select-credit-note":
+            state = reduce(state, { type: "selectDocument", documentKind: "creditNote" });
+            break;
+          case "toggle-stress":
+            state = reduce(state, { type: "setStressFit", enabled: !state.stressFit });
+            break;
+          case "enable-stress":
+            state = reduce(state, { type: "setStressFit", enabled: true });
+            break;
+          case "disable-stress":
+            state = reduce(state, { type: "setStressFit", enabled: false });
+            break;
+          case "export":
+            void exportSelectedDocument();
+            return;
+          default:
+            throw new TypeError(`Unknown interaction: ${action}`);
+        }
+        render();
+      }
+
+      document.addEventListener("click", (event) => {
+        if (!(event.target instanceof HTMLElement)) return;
+        const scenario = event.target.closest("[data-scenario]")?.dataset.scenario;
+        if (scenario) {
+          state = reduce(state, { type: "selectScenario", scenario });
+          render();
+          return;
+        }
+        const action = event.target.closest("[data-action]")?.dataset.action;
+        if (action) dispatchAction(action);
+      });
+
+      const exportMode = new URL(location.href).searchParams.get("export") === "true";
+      document.body.dataset.export = String(exportMode);
+      render();
+
+      const ready = Promise.all([
+        document.fonts.ready,
+        ...[...document.images].map((image) =>
+          image.complete
+            ? Promise.resolve()
+            : new Promise((resolve, reject) => {
+                image.addEventListener("load", resolve, { once: true });
+                image.addEventListener("error", reject, { once: true });
+              }),
+        ),
+      ]);
+
+      window.pdfRenderingProof = Object.freeze({ ready, verify: verifyDocument });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,153 @@
+.invoice-history-list {
+  display: grid;
+  gap: 16px;
+}
+
+.document-chain {
+  display: grid;
+  gap: 10px;
+}
+
+.document-chain > div {
+  display: grid;
+  gap: 10px;
+}
+
+.credit-note-history-item {
+  margin-left: 42px;
+  border-left: 4px solid var(--accent);
+}
+
+.invoice-history-item {
+  padding: 24px 26px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 78%);
+  box-shadow: 0 15px 40px rgb(42 53 45 / 7%);
+}
+
+.invoice-history-item > header,
+.invoice-history-actions,
+.invoice-history-command-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.invoice-history-item h2,
+.invoice-history-item p {
+  margin: 0;
+}
+
+.invoice-history-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin: 22px 0;
+}
+
+.invoice-history-facts dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.invoice-history-facts dd {
+  margin: 5px 0 0;
+  font-size: 0.84rem;
+}
+
+.invoice-history-actions {
+  justify-content: flex-start;
+}
+
+.invoice-history-command-row {
+  justify-content: space-between;
+}
+
+.invoice-history-command-row > .invoice-history-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.invoice-history-feedback {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.full-credit-note-flow,
+.credit-note-complete {
+  display: grid;
+  gap: 24px;
+}
+
+.credit-note-flow-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.credit-note-flow-heading h1,
+.credit-note-flow-heading p,
+.credit-note-complete h1,
+.credit-note-complete p {
+  margin: 0;
+}
+
+.credit-note-flow-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.8fr) minmax(560px, 1.2fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.credit-note-controls {
+  display: grid;
+  gap: 18px;
+}
+
+.credit-note-original,
+.credit-note-retained-records > section {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 78%);
+}
+
+.credit-note-original h2,
+.credit-note-original p,
+.credit-note-retained-records h2 {
+  margin: 0 0 10px;
+}
+
+.credit-note-preview-empty {
+  display: grid;
+  min-height: 360px;
+  place-items: center;
+  padding: 32px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.credit-note-retained-records {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.credit-note-complete-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@media (max-width: 1180px) {
+  .credit-note-flow-grid {
+    grid-template-columns: 1fr;
+  }
+}

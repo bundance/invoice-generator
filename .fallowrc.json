@@ -1,0 +1,194 @@
+{
+  "$schema": "./node_modules/fallow/schema.json",
+  "minimumVersion": "3.22.0",
+  "entry": [
+    "playwright.evidence.config.ts",
+    "src/infrastructure/electron/main.ts",
+    "src/infrastructure/electron/preload.ts"
+  ],
+  "ignorePatterns": [
+    ".scratch/**",
+    "dist-electron/**",
+    "release/**",
+    "test-results/**",
+    "tools/oxlint/anti-slop/**"
+  ],
+  "ignoreFindings": [
+    "src/infrastructure/persistence/released-workspace-state-schemas.ts",
+    "src/renderer/ui/class-names.ts",
+    "tests/fixtures/workspace-state-conversions.ts"
+  ],
+  "ignoreDependencies": [
+    "@oxlint/plugins",
+    "class-variance-authority",
+    "lucide-react",
+    "react",
+    "react-dom",
+    "shadcn"
+  ],
+  "rules": {
+    "boundary-violation": "error"
+  },
+  "boundaries": {
+    "zones": [
+      {
+        "name": "unit-tests",
+        "patterns": [
+          "src/**/*.test.ts",
+          "src/**/*.test.tsx",
+          "src/**/*-test-support.ts",
+          "src/**/*-test-support.tsx",
+          "tests/fixtures/**",
+          "tests/setup.ts"
+        ]
+      },
+      {
+        "name": "e2e-tests",
+        "patterns": ["tests/e2e/**"]
+      },
+      {
+        "name": "domain",
+        "patterns": [
+          "src/domain/clients/**",
+          "src/domain/invoices/**",
+          "src/domain/issuer/**",
+          "src/domain/money/**",
+          "src/domain/tax/**",
+          "src/domain/time/**",
+          "src/domain/validation/**"
+        ]
+      },
+      {
+        "name": "application",
+        "patterns": ["src/application/**"]
+      },
+      {
+        "name": "documents",
+        "patterns": ["src/documents/**"]
+      },
+      {
+        "name": "infrastructure",
+        "patterns": [
+          "src/infrastructure/electron/**",
+          "src/infrastructure/persistence/**",
+          "src/infrastructure/release-gate/**",
+          "src/infrastructure/testing/**"
+        ]
+      },
+      {
+        "name": "renderer-entry",
+        "patterns": ["index.html", "src/renderer/main.tsx"]
+      },
+      {
+        "name": "renderer-app",
+        "patterns": ["src/renderer/app/**"]
+      },
+      {
+        "name": "renderer-features",
+        "autoDiscover": ["src/renderer/features"]
+      },
+      {
+        "name": "renderer-hooks",
+        "patterns": ["src/renderer/hooks/**"]
+      },
+      {
+        "name": "renderer-styles",
+        "patterns": ["src/renderer/styles/**"]
+      },
+      {
+        "name": "renderer-types",
+        "patterns": ["src/renderer/types/**"]
+      },
+      {
+        "name": "renderer-ui",
+        "patterns": ["src/renderer/ui/**"]
+      }
+    ],
+    "rules": [
+      {
+        "from": "unit-tests",
+        "allow": [
+          "domain",
+          "application",
+          "documents",
+          "infrastructure",
+          "renderer-app",
+          "renderer-features",
+          "renderer-hooks",
+          "renderer-types",
+          "renderer-ui"
+        ]
+      },
+      {
+        "from": "e2e-tests",
+        "allow": ["unit-tests", "domain", "application", "documents", "infrastructure"]
+      },
+      {
+        "from": "domain",
+        "allow": []
+      },
+      {
+        "from": "application",
+        "allow": ["domain"]
+      },
+      {
+        "from": "documents",
+        "allow": ["domain"]
+      },
+      {
+        "from": "infrastructure",
+        "allow": ["domain", "application", "documents"]
+      },
+      {
+        "from": "renderer-entry",
+        "allow": ["renderer-app", "renderer-styles"]
+      },
+      {
+        "from": "renderer-app",
+        "allow": [
+          "domain",
+          "application",
+          "renderer-features",
+          "renderer-hooks",
+          "renderer-styles",
+          "renderer-types",
+          "renderer-ui"
+        ]
+      },
+      {
+        "from": "renderer-features",
+        "allow": [
+          "domain",
+          "application",
+          "documents",
+          "renderer-hooks",
+          "renderer-types",
+          "renderer-ui"
+        ],
+        "allowTypeOnly": ["renderer-app"]
+      },
+      {
+        "from": "renderer-hooks",
+        "allow": ["domain", "application", "renderer-types"]
+      },
+      {
+        "from": "renderer-styles",
+        "allow": ["documents", "renderer-app", "renderer-features"]
+      },
+      {
+        "from": "renderer-types",
+        "allow": [],
+        "allowTypeOnly": ["application", "domain"]
+      },
+      {
+        "from": "renderer-ui",
+        "allow": ["renderer-hooks", "renderer-types"],
+        "allowTypeOnly": ["documents"]
+      }
+    ],
+    "coverage": {
+      "requireAllFiles": true,
+      "allowUnmatched": ["*.config.ts"]
+    }
+  }
+}

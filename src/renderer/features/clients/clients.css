@@ -1,0 +1,217 @@
+.clients-workspace {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.55fr) minmax(560px, 1.45fr);
+  align-items: start;
+  gap: 20px;
+}
+
+.clients-sidebar {
+  display: grid;
+  gap: 14px;
+}
+
+.clients-sidebar > .primary-action {
+  justify-self: start;
+}
+
+.client-list-panel,
+.client-editor {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 82%);
+  box-shadow: 0 15px 40px rgb(42 53 45 / 7%);
+}
+
+.client-search {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  color: #38433c;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.client-search > div {
+  position: relative;
+}
+
+.client-search svg {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 17px;
+  color: var(--muted);
+}
+
+.client-search input,
+.settings-field select {
+  width: 100%;
+  border: 1px solid #c9cfc8;
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: white;
+}
+
+.client-search input {
+  padding-left: 35px;
+}
+
+.client-list {
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 14px 14px;
+}
+
+.client-row {
+  display: grid;
+  width: 100%;
+  min-height: 68px;
+  grid-template-columns: 38px 1fr auto;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: white;
+  text-align: left;
+}
+
+.client-row:last-child {
+  border-bottom: 0;
+}
+
+.client-row:hover,
+.client-row[aria-current="true"] {
+  background: #f6eee8;
+}
+
+.client-row[aria-current="true"] {
+  box-shadow: inset 3px 0 var(--accent);
+}
+
+.client-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 8px;
+  color: white;
+  background: var(--ink);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.client-row strong,
+.client-row small {
+  display: block;
+}
+
+.client-row small {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.client-editor {
+  display: grid;
+  gap: 28px;
+  padding: 30px;
+}
+
+.client-editor > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.client-editor > header h2 {
+  margin-bottom: 8px;
+}
+
+.client-editor > header p:not(.eyebrow, .save-status),
+.fieldset-help,
+.selection-note {
+  margin-bottom: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.sequence-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.fieldset-help {
+  margin: 0 0 14px;
+  font-size: 0.8rem;
+}
+
+.client-editor input[readonly],
+.client-editor textarea[readonly] {
+  color: #606a63;
+  background: #f1f2ef;
+}
+
+.client-check-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.client-check-field input {
+  margin-top: 3px;
+}
+
+.client-check-field strong,
+.client-check-field small {
+  display: block;
+}
+
+.client-check-field small {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.create-client-select {
+  margin: 24px 0;
+}
+
+.client-defaults {
+  display: grid;
+  gap: 0;
+  margin: 0 0 20px;
+}
+
+.client-defaults div {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.client-defaults dt {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.client-defaults dd {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.selection-note {
+  font-size: 0.78rem;
+}

@@ -1,0 +1,6 @@
+{
+  "name": "invoice-creation-experience-prototype",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.mjs"
+}

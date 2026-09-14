@@ -1,0 +1,13 @@
+{
+  "name": "invoice-creation-prototype",
+  "private": true,
+  "main": "./dist-electron/main.js",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build"
+  },
+  "devDependencies": {
+    "electron": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

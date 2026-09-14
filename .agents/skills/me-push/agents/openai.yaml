@@ -1,0 +1,3 @@
+interface:
+  display_name: "Me Push"
+  short_description: "Publish and merge the current feature branch, then sync main"
