@@ -1,4 +1,8 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vite-plus/test";
+import { z } from "zod";
 
 import {
   automatedChecks,
@@ -8,6 +12,12 @@ import {
   requirementMappings,
   specificationSectionMappings,
 } from "./release-plan.js";
+
+const packageScriptsSchema = z.object({
+  scripts: z.object({
+    "check:quality": z.string(),
+  }),
+});
 
 describe("local release gate", () => {
   it("runs every release-blocking stage in the specified order", () => {
@@ -23,11 +33,36 @@ describe("local release gate", () => {
     ]);
   });
 
-  it("runs reference, generated invoice, and generated credit-note evidence in the PDF stage", () => {
+  it("keeps the shared quality gate independent of network services", async () => {
+    const packageJsonInput: unknown = JSON.parse(
+      await readFile(join(process.cwd(), "package.json"), "utf8"),
+    );
+    const packageScripts = packageScriptsSchema.parse(packageJsonInput).scripts;
+
+    expect(packageScripts["check:quality"]).toContain("react-doctor");
+    expect(packageScripts["check:quality"]).toContain("--no-score");
+    expect(packageScripts["check:quality"]).toContain("--no-telemetry");
+    expect(packageScripts["check:quality"]).toContain("--no-supply-chain");
+  });
+
+  it("uses tracked production baselines for release-blocking PDF evidence", () => {
     const pdfStage = releaseStages.find(({ id }) => id === "pdf");
+    const rasterCheck = automatedChecks.find(({ id }) => id === "pdf-raster-fidelity");
 
     expect(pdfStage?.command).toContain("--project=pdf");
+    expect(pdfStage?.command).not.toContain("supplied reference invoice");
+    expect(pdfStage?.command).toContain("GBP UK VAT invoice");
     expect(pdfStage?.command).toContain("outside-scope invoice");
+    expect(rasterCheck).toMatchObject({
+      evidence: {
+        kind: "tests",
+        titleFragments: [
+          "GBP UK VAT invoice keeps exact tax facts",
+          "foreign-currency UK VAT invoice retains sterling evidence",
+          "outside-scope invoice issues once",
+        ],
+      },
+    });
   });
 
   it("lets Playwright projects own the accepted Electron and PDF test inventories", () => {
