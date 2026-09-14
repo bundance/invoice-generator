@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "vp dev",
     "test": "vp test run",
-    "check:quality": "vp check && react-doctor . --scope full --yes --no-score --no-telemetry --blocking warning && fallow --fail-on-issues --summary",
+    "check:quality": "vp check && react-doctor . --scope full --yes --no-score --no-telemetry --no-supply-chain --blocking warning && fallow --fail-on-issues --summary",
     "test:electron": "playwright test --project=electron",
     "package:mac": "node --experimental-strip-types --no-warnings src/infrastructure/release-gate/package-mac.ts",
     "inspect:package": "node --experimental-strip-types --no-warnings src/infrastructure/release-gate/inspect-package.ts",

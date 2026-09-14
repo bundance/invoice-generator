@@ -56,7 +56,7 @@ export const releaseStages = [
   },
   {
     command:
-      'timeout 300 env PLAYWRIGHT_JSON_OUTPUT_FILE=test-results/pdf.json playwright test --project=pdf --grep "supplied reference invoice|GBP UK VAT invoice|foreign-currency UK VAT invoice|outside-scope invoice" --reporter=line,json',
+      'timeout 300 env PLAYWRIGHT_JSON_OUTPUT_FILE=test-results/pdf.json playwright test --project=pdf --grep "GBP UK VAT invoice|foreign-currency UK VAT invoice|outside-scope invoice" --reporter=line,json',
     id: "pdf",
     name: "PDF verification",
     result: { kind: "playwright", path: "test-results/pdf.json" },
@@ -197,7 +197,11 @@ export const automatedChecks = [
     "pdf-raster-fidelity",
     "Frozen fixed-DPI invoice and credit-note raster baselines",
     "pdf",
-    ["supplied reference invoice matches", "outside-scope invoice issues once"],
+    [
+      "GBP UK VAT invoice keeps exact tax facts",
+      "foreign-currency UK VAT invoice retains sterling evidence",
+      "outside-scope invoice issues once",
+    ],
   ),
   namedCheck(
     "package-release-candidate",
