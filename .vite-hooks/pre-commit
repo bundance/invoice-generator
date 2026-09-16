@@ -1,1 +1,1 @@
-vp run check:quality
+timeout 300 vp run check:quality
