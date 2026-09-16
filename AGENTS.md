@@ -2,14 +2,14 @@
 
 # Using Vite+, the Unified Toolchain for the Web
 
-This project is using Vite+, a unified toolchain built on top of Vite, Rolldown, Vitest, tsdown, Oxlint, Oxfmt, and Vite Task. Vite+ wraps runtime management, package management, and frontend tooling in a single global CLI called `vp`. Vite+ is distinct from Vite, and it invokes Vite through `vp dev` and `vp build`. Run `vp help` to print a list of commands and `vp <command> --help` for information about a specific command.
+This project is using Vite+, a unified toolchain built on top of Vite, Rolldown, Vitest, tsdown, Oxlint, Oxfmt, and Vite Task. Vite+ wraps runtime management, package management, and frontend tooling in a single global CLI called `vp`. Vite+ is distinct from Vite. Use the repository's package scripts through `vp run` so commands re-enter the pinned Node.js runtime. Run `vp help` to print a list of commands and `vp <command> --help` for information about a specific command.
 
 Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.dev/guide/.
 
 ## Review Checklist
 
-- [ ] Run `vp install` after pulling remote changes and before getting started.
-- [ ] Run `vp check` and `vp test` to format, lint, type check and test changes.
+- [ ] Run `CI=true timeout 300 sh scripts/run-with-project-node.sh vp install --frozen-lockfile` after pulling remote changes and before getting started.
+- [ ] Run `timeout 300 vp run check:quality` and `timeout 300 vp run test` to format, lint, type check and test changes.
 - [ ] Check if there are `vite.config.ts` tasks or `package.json` scripts necessary for validation, run via `vp run <script>`.
 - [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
 
@@ -17,8 +17,14 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 
 ## Project Vite+ runtime
 
-- Run full validation as `timeout 900 vp run validate`. Vite+ resolves the Node.js version from `.node-version`; a different result from standalone `node --version` does not require an override.
-- Use `vp env exec --node <version> ...` only when `vp env doctor` or a failed `vp` command proves that automatic runtime resolution is incorrect.
+- Package scripts use `scripts/run-with-project-node.sh` to run under the exact version in `.node-version`. This is required because a system-first Vite+ host can report the project pin while running scripts with the system Node.js binary.
+- Run `timeout 30 vp run check:runtime` to verify the actual script runtime. A passing `vp env doctor` result is not proof by itself.
+- Run full validation as `timeout 900 vp run validate`.
+- For a Vite+ built-in without a package script, run `sh scripts/run-with-project-node.sh vp <command>`.
+
+## Harness operation
+
+Before dependency setup, validation, release packaging, Electron UI verification, or evidence handling, read `docs/harness/README.md`. Run commands that launch Electron, including the full gate, outside the sandbox on the first attempt.
 
 ## Artifact locations
 
@@ -38,4 +44,4 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 
 Always read and run `.agents/skills/verify-invoice-generator/SKILL.md` before completing any task that changes or verifies application behavior. This live run supplements the automated checks; it does not replace them.
 
-Always run `vp run check:quality` and fix any errors and warning that are raised after completing any task that changes application code. Do not do this for documentation.
+Always run `timeout 300 vp run check:quality` and fix any errors and warnings after completing any task that changes application code. Do not do this for documentation.

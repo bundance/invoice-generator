@@ -24,7 +24,8 @@ type SpecificationSectionMapping = Readonly<{
 
 export const releaseStages = [
   {
-    command: "timeout 300 vp run check:quality && timeout 60 vp run check:fallow-plugins",
+    command:
+      "timeout 30 vp run check:runtime && timeout 300 vp run check:quality && timeout 60 vp run check:fallow-plugins",
     id: "quality",
     name: "shared quality gate",
   },
@@ -138,6 +139,7 @@ export const electronScenarioGroups = [
 ] as const satisfies readonly NamedCheck[];
 
 export const automatedChecks = [
+  namedCheck("toolchain-node-runtime", "Pinned Node.js release runtime", "quality"),
   namedCheck("quality-vite-plus", "Vite+ format, lint, and type checks", "quality"),
   namedCheck("quality-react-doctor", "Full blocking React Doctor scan", "quality"),
   namedCheck(

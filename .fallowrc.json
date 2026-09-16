@@ -13,16 +13,13 @@
     "test-results/**",
     "tools/oxlint/anti-slop/**"
   ],
-  "ignoreFindings": [
-    "src/infrastructure/persistence/released-workspace-state-schemas.ts",
-    "src/renderer/ui/class-names.ts",
-    "tests/fixtures/workspace-state-conversions.ts"
-  ],
+  "ignoreFindings": ["src/renderer/ui/class-names.ts"],
   "ignoreDependencies": [
     "@oxlint/plugins",
     "class-variance-authority",
     "lucide-react",
     "react",
+    "react-doctor",
     "react-dom",
     "shadcn"
   ],

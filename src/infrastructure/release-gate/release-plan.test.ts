@@ -38,7 +38,9 @@ describe("local release gate", () => {
       await readFile(join(process.cwd(), "package.json"), "utf8"),
     );
     const packageScripts = packageScriptsSchema.parse(packageJsonInput).scripts;
+    const qualityStage = releaseStages.find(({ id }) => id === "quality");
 
+    expect(qualityStage?.command).toContain("vp run check:runtime");
     expect(packageScripts["check:quality"]).toContain("react-doctor");
     expect(packageScripts["check:quality"]).toContain("--no-score");
     expect(packageScripts["check:quality"]).toContain("--no-telemetry");
