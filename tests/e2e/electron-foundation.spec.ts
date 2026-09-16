@@ -28,6 +28,11 @@ test("fresh production launch creates the fixed local workspace", async () => {
       .toBe(1);
 
     await expect(page.getByRole("heading", { level: 1, name: "Create invoice" })).toBeVisible();
+    expect(
+      await electronApp.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()[0]?.isVisible(),
+      ),
+    ).toBe(false);
     await expect(page.getByText("Stored on this Mac")).toBeVisible();
     await expect(page.getByRole("banner")).toContainText("Create invoice");
     expect(
