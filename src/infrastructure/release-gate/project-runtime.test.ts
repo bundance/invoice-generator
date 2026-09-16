@@ -11,18 +11,12 @@ const runtimeCheckPath = join(
   repositoryRoot,
   "src/infrastructure/release-gate/check-project-runtime.ts",
 );
-const runtimeWrapperPath = join(repositoryRoot, "scripts/run-with-project-node.sh");
 
 describe("project Node runtime", () => {
-  it("runs repository commands with the version pinned by .node-version", async () => {
+  it("runs tests with the version pinned by .node-version", async () => {
     const pinnedVersion = (await readFile(join(repositoryRoot, ".node-version"), "utf8")).trim();
-    const result = spawnSync("sh", [runtimeWrapperPath, "node", "--version"], {
-      cwd: repositoryRoot,
-      encoding: "utf8",
-    });
 
-    expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe(`v${pinnedVersion}`);
+    expect(process.versions.node).toBe(pinnedVersion);
   });
 
   it("rejects a process that does not match the project pin", async () => {
