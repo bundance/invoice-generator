@@ -77,6 +77,7 @@ export async function launchProductionApp(
     env: {
       ...createProductionEnvironment(),
       INVOICE_GENERATOR_TEST_FAULTS: JSON.stringify(faultPlan),
+      INVOICE_GENERATOR_TEST_HIDE_WINDOW: "1",
       INVOICE_GENERATOR_TEST_NETWORK_LOG: networkLogPath,
     },
   });

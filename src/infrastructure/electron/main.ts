@@ -21,6 +21,7 @@ let mainWindow: BrowserWindow | null = null;
 let openingMainWindow: Promise<void> | null = null;
 let invoiceApplication: InvoiceApplication | null = null;
 const faultInjector = createFaultInjectorFromJson(process.env.INVOICE_GENERATOR_TEST_FAULTS);
+const keepMainWindowHidden = process.env.INVOICE_GENERATOR_TEST_HIDE_WINDOW === "1";
 
 if (!app.requestSingleInstanceLock()) {
   app.exit(0);
@@ -140,7 +141,7 @@ async function createMainWindow(invoiceApplication: InvoiceApplication): Promise
     window,
   });
   await window.loadURL(rendererUrl);
-  window.show();
+  if (!keepMainWindowHidden) window.show();
 
   return window;
 }
