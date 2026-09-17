@@ -1,5 +1,6 @@
 appId: com.codernetic.invoicegenerator
 productName: Invoice Generator
+publish: null
 asar: true
 directories:
   output: release

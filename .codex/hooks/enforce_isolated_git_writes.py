@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Require direct, isolated git add and git commit shell invocations.
+"""Require direct, isolated git add, stage, and commit shell invocations.
 
-Saved Codex rules allow direct `git add` and `git commit` commands to cross the
-workspace-write sandbox without an approval prompt. This hook blocks command
-shapes that bypass those rules and denies fallback approval requests.
+Saved Codex rules allow these commands to cross the workspace-write sandbox
+without an approval prompt. This hook blocks command shapes that bypass those
+rules and denies fallback approval requests.
 """
 
 import json
@@ -16,7 +16,7 @@ from typing import List, Optional, Sequence
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-GIT_WRITE_SUBCOMMANDS = {"add", "commit"}
+GIT_WRITE_SUBCOMMANDS = {"add", "stage", "commit"}
 SHELL_CONTROL_TOKENS = {
     "&",
     "&&",
@@ -52,9 +52,9 @@ GIT_GLOBAL_OPTIONS_WITH_VALUE = {
     "--work-tree",
 }
 ASSIGNMENT_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-LIKELY_GIT_WRITE_PATTERN = re.compile(r"(?<![A-Za-z0-9_-])git\s+(?:add|commit)\b")
+LIKELY_GIT_WRITE_PATTERN = re.compile(r"(?<![A-Za-z0-9_-])git\s+(?:add|stage|commit)\b")
 BACKTICK_GIT_WRITE_PATTERN = re.compile(
-    r"`[^`]*\bgit\s+(?:add|commit)\b[^`]*`",
+    r"`[^`]*\bgit\s+(?:add|stage|commit)\b[^`]*`",
     re.DOTALL,
 )
 
@@ -144,6 +144,12 @@ def unwrap_transparent_command(tokens: Sequence[str]) -> List[str]:
 
     while remaining_tokens:
         executable = os.path.basename(remaining_tokens[0])
+
+        if executable == "rtk":
+            remaining_tokens.pop(0)
+            if remaining_tokens and remaining_tokens[0] == "proxy":
+                remaining_tokens.pop(0)
+            continue
 
         if executable == "env":
             remaining_tokens.pop(0)
@@ -292,14 +298,14 @@ def evaluate_event(event: dict) -> Optional[dict]:
 
     if hook_event_name == "PreToolUse" and not is_isolated_direct_git_write(command):
         return pre_tool_use_denial(
-            "Run git add or git commit as a direct, isolated command. Do not use "
-            "a shell wrapper, command chain, pipe, redirection, substitution, "
+            "Run git add, git stage, or git commit as a direct, isolated command. "
+            "Do not use RTK, a shell wrapper, command chain, pipe, redirection, substitution, "
             "environment prefix, wildcard, or timeout wrapper."
         )
 
     if hook_event_name == "PermissionRequest":
         return permission_request_denial(
-            "This repository uses saved rules for isolated git add and git commit "
+            "This repository uses saved rules for isolated git add, git stage, and git commit "
             "calls. The approval request was blocked; retry the Git write as one "
             "direct command or report that the saved rule is missing."
         )

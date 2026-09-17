@@ -38,6 +38,39 @@ class GitWriteIsolationTests(unittest.TestCase):
     def test_allows_direct_git_add(self) -> None:
         self.assertIsNone(HOOK.evaluate_event(event("git add -- app.json")))
 
+    def test_allows_direct_git_stage(self) -> None:
+        self.assertIsNone(HOOK.evaluate_event(event("git stage -- app.json")))
+
+    def test_blocks_chained_git_stage(self) -> None:
+        self.assert_pre_tool_use_denied("git stage -- app.json && git status --short")
+
+    def test_blocks_rtk_wrapped_git_writes(self) -> None:
+        for subcommand in ("add", "stage", "commit"):
+            for wrapper in ("rtk", "rtk proxy", "/usr/local/bin/rtk"):
+                with self.subTest(subcommand=subcommand, wrapper=wrapper):
+                    self.assert_pre_tool_use_denied(f"{wrapper} git {subcommand} --dry-run")
+
+    def test_blocks_rtk_chain(self) -> None:
+        self.assert_pre_tool_use_denied("rtk git add -A && rtk git status --short")
+
+    def test_ignores_rtk_read_only_git_commands(self) -> None:
+        self.assertIsNone(HOOK.evaluate_event(event("rtk git status --short")))
+
+    def test_denies_fallback_approval_for_each_git_write(self) -> None:
+        for subcommand in ("add", "stage", "commit"):
+            for wrapper in ("", "rtk ", "rtk proxy "):
+                with self.subTest(subcommand=subcommand, wrapper=wrapper):
+                    decision = HOOK.evaluate_event(
+                        event(f"{wrapper}git {subcommand} --dry-run", "PermissionRequest")
+                    )
+                    self.assertIsNotNone(decision)
+                    self.assertEqual(
+                        decision["hookSpecificOutput"]["decision"]["behavior"], "deny"
+                    )
+
+    def test_blocks_malformed_git_stage(self) -> None:
+        self.assert_pre_tool_use_denied("git stage 'unterminated")
+
     def test_allows_direct_git_commit_with_quoted_shell_text(self) -> None:
         command = "git commit -m 'test: preserve && and $HOME as text'"
         self.assertIsNone(HOOK.evaluate_event(event(command)))

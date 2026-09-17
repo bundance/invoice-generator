@@ -1,0 +1,4 @@
+# Keep these operations prompt-free in this trusted project.
+prefix_rule(pattern=["git", "add"], decision="allow")
+prefix_rule(pattern=["git", "stage"], decision="allow")
+prefix_rule(pattern=["git", "commit"], decision="allow")
