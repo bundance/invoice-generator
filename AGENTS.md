@@ -8,7 +8,7 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 
 ## Review Checklist
 
-- [ ] Run `CI=true timeout 300 sh scripts/run-with-project-node.sh vp install --frozen-lockfile` after pulling remote changes and before getting started.
+- [ ] Run `CI=true timeout 300 vp install --frozen-lockfile` after pulling remote changes and before getting started.
 - [ ] Run `timeout 300 vp run check:quality` and `timeout 300 vp run test` to format, lint, type check and test changes.
 - [ ] Check if there are `vite.config.ts` tasks or `package.json` scripts necessary for validation, run via `vp run <script>`.
 - [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
@@ -17,10 +17,10 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 
 ## Project Vite+ runtime
 
-- Package scripts use `scripts/run-with-project-node.sh` to run under the exact version in `.node-version`. This is required because a system-first Vite+ host can report the project pin while running scripts with the system Node.js binary.
+- Vite+ managed mode runs package scripts with the exact version in `.node-version`. If `vp env doctor` reports system-first mode, run `vp env on` before using the repository.
 - Run `timeout 30 vp run check:runtime` to verify the actual script runtime. A passing `vp env doctor` result is not proof by itself.
 - Run full validation as `timeout 900 vp run validate`.
-- For a Vite+ built-in without a package script, run `sh scripts/run-with-project-node.sh vp <command>`.
+- For a Vite+ built-in without a package script, run `vp <command>`.
 
 ## Harness operation
 

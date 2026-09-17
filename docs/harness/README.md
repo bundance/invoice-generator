@@ -4,17 +4,17 @@ Run harness commands from the repository root. The supported package manager is 
 
 Use `vp install`, `vp add`, and `vp remove` for dependency work. Do not substitute direct `npm` or `pnpm` commands; that bypasses the repository's Vite+ runtime and package-manager contract.
 
-Package scripts self-pin Node through [`scripts/run-with-project-node.sh`](../../scripts/run-with-project-node.sh). Use that wrapper explicitly for setup and direct focused tests. This avoids a host Vite+ configuration selecting a different system Node version.
+Package scripts use the Node.js version in [`.node-version`](../../.node-version) through Vite+ managed mode. If `vp env doctor` reports system-first mode, run `vp env on` before setup or validation.
 
 ## Commands
 
-| Job                | Command                                                                                           | Writes generated output                                 |
-| ------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Setup              | `CI=true timeout 300 sh scripts/run-with-project-node.sh vp install --frozen-lockfile`            | Hydrates `node_modules/` and installs repository hooks  |
-| Fast quality       | `timeout 300 vp run check:quality`                                                                | No product or release artifacts                         |
-| Routine test suite | `timeout 300 vp run test`                                                                         | No release artifacts; tests use disposable fixtures     |
-| Focused tests      | `timeout 300 sh scripts/run-with-project-node.sh vp test run <paths> --allowOnly=false --retry=0` | No release artifacts; tests use disposable fixtures     |
-| Full release gate  | `timeout 900 vp run validate`                                                                     | Rebuilds test, application, package, and release output |
+| Job                | Command                                                       | Writes generated output                                 |
+| ------------------ | ------------------------------------------------------------- | ------------------------------------------------------- |
+| Setup              | `CI=true timeout 300 vp install --frozen-lockfile`            | Hydrates `node_modules/` and installs repository hooks  |
+| Fast quality       | `timeout 300 vp run check:quality`                            | No product or release artifacts                         |
+| Routine test suite | `timeout 300 vp run test`                                     | No release artifacts; tests use disposable fixtures     |
+| Focused tests      | `timeout 300 vp test run <paths> --allowOnly=false --retry=0` | No release artifacts; tests use disposable fixtures     |
+| Full release gate  | `timeout 900 vp run validate`                                 | Rebuilds test, application, package, and release output |
 
 The full gate is the authoritative result. Its stages and time limits live in [`release-plan.ts`](../../src/infrastructure/release-gate/release-plan.ts). It runs quality checks, unit and component tests, the production build, Electron journeys, PDF checks, arm64 DMG packaging, and package inspection.
 
