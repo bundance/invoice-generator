@@ -15,6 +15,22 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 
 <!--VITE PLUS END-->
 
+## Git staging and commits
+
+Run each authorized `git add`, `git stage`, or `git commit` as a separate,
+direct shell command. Run inspection commands in separate calls. These Git
+writes are exempt from global RTK-prefix instructions and timeout wrappers so
+the saved command rules match. Use the execution tool's working-directory
+field to select this repository.
+
+If a hook rejects a chained or wrapped Git write, retry the direct command.
+If the direct command cannot run, inspect the saved rules and hook trust
+instead of requesting another staging or commit approval. Hook installation
+is complete only when both repository hooks report `trusted` and a live
+chained dry-run is blocked before execution without an approval prompt.
+Verify newly trusted hooks in a fresh session; an already-open task can retain
+its previous hook configuration.
+
 ## Project Vite+ runtime
 
 - Vite+ managed mode runs package scripts with the exact version in `.node-version`. If `vp env doctor` reports system-first mode, run `vp env on` before using the repository.
