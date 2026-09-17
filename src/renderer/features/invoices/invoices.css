@@ -145,9 +145,3 @@
   flex-wrap: wrap;
   gap: 12px;
 }
-
-@media (max-width: 1180px) {
-  .credit-note-flow-grid {
-    grid-template-columns: 1fr;
-  }
-}
