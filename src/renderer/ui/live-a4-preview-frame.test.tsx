@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { LiveA4PreviewFrame } from "./live-a4-preview-frame.tsx";
@@ -53,6 +53,20 @@ describe("Live A4 preview frame", () => {
     expect(Number.parseFloat(page.style.height)).toBeCloseTo(a4HeightPixels, 4);
     expect(document.style.transform).toBe("scale(1)");
   });
+
+  it("commits a refit before the native resize callback returns", () => {
+    const { container } = render(
+      <LiveA4PreviewFrame ariaLabel="Invoice preview" documentId="Draft">
+        <article>Fixed invoice document</article>
+      </LiveA4PreviewFrame>,
+    );
+    const page = container.querySelector<HTMLElement>(".live-a4-preview-page");
+    if (!page || !activePreviewResize) throw new Error("Expected an observed fitted page");
+
+    activePreviewResize({ height: 600, width: 600 });
+
+    expect(Number.parseFloat(page.style.height)).toBeCloseTo(600, 4);
+  });
 });
 
 type PreviewSize = Readonly<{ height: number; width: number }>;
@@ -61,7 +75,7 @@ let activePreviewResize: ((size: PreviewSize) => void) | null = null;
 
 function resizePreview(size: PreviewSize): void {
   if (!activePreviewResize) throw new Error("Expected the preview to observe its viewport");
-  act(() => activePreviewResize?.(size));
+  activePreviewResize(size);
 }
 
 class PreviewResizeObserver implements ResizeObserver {

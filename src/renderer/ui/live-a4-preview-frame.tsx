@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 
 type LiveA4PreviewFrameProps = Readonly<{
   ariaLabel: string;
@@ -10,18 +10,27 @@ const a4WidthPixels = (210 / 25.4) * 96;
 const a4HeightPixels = (297 / 25.4) * 96;
 
 export function LiveA4PreviewFrame({ ariaLabel, children, documentId }: LiveA4PreviewFrameProps) {
+  const frameRef = useRef<HTMLElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const documentRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0);
 
   useEffect(() => {
+    const frame = frameRef.current;
+    const page = pageRef.current;
+    const previewDocument = documentRef.current;
     const viewport = viewportRef.current;
-    if (!viewport) return;
+    if (!frame || !page || !previewDocument || !viewport) return;
 
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return;
       const { height, width } = entry.contentRect;
       if (height <= 0 || width <= 0) return;
-      setScale(Math.min(width / a4WidthPixels, height / a4HeightPixels, 1));
+      const scale = Math.min(width / a4WidthPixels, height / a4HeightPixels, 1);
+      page.style.height = `${a4HeightPixels * scale}px`;
+      page.style.width = `${a4WidthPixels * scale}px`;
+      previewDocument.style.transform = `scale(${scale})`;
+      frame.removeAttribute("aria-busy");
     });
     observer.observe(viewport);
     return () => observer.disconnect();
@@ -29,24 +38,23 @@ export function LiveA4PreviewFrame({ ariaLabel, children, documentId }: LiveA4Pr
 
   return (
     <section
-      aria-busy={scale === 0}
+      aria-busy="true"
       aria-label={ariaLabel}
       className="preview-panel live-a4-preview-frame"
       data-preview-mode="fit"
+      ref={frameRef}
     >
       <div className="preview-toolbar">
         <span>Live A4 preview</span>
         <small>{documentId}</small>
       </div>
       <div className="live-a4-preview-viewport" ref={viewportRef}>
-        <div
-          className="live-a4-preview-page"
-          style={{
-            height: `${a4HeightPixels * scale}px`,
-            width: `${a4WidthPixels * scale}px`,
-          }}
-        >
-          <div className="live-a4-preview-document" style={{ transform: `scale(${scale})` }}>
+        <div className="live-a4-preview-page" ref={pageRef} style={{ height: 0, width: 0 }}>
+          <div
+            className="live-a4-preview-document"
+            ref={documentRef}
+            style={{ transform: "scale(0)" }}
+          >
             {children}
           </div>
         </div>
