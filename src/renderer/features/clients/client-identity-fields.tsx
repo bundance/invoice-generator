@@ -19,7 +19,6 @@ export function ClientIdentityFields({ errors, readOnly, register }: ClientIdent
           label="Legal name"
           readOnly={readOnly}
           registration={register("legalName")}
-          wide
         />
         <FormField
           error={errors.postalAddress?.message}

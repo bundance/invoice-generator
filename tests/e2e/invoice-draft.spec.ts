@@ -16,6 +16,35 @@ import {
   test,
 } from "./support/electron-test-app.js";
 
+test("client legal name spans the invoice inspector width", async () => {
+  const userDataPath = await createUserDataPath("client-legal-name-width");
+  await writeFile(
+    join(userDataPath, "state.json"),
+    serializeWorkspaceState({
+      ...initialWorkspaceState,
+      clients: [completeClient],
+      issuer: completeIssuer,
+    }),
+  );
+  const electronApp = await launchProductionApp(userDataPath);
+
+  try {
+    const page = await electronApp.firstWindow();
+    const [legalNameBox, postalAddressBox] = await Promise.all([
+      page.getByLabel("Client legal name").boundingBox(),
+      page.getByLabel("Client postal address").boundingBox(),
+    ]);
+    if (!legalNameBox || !postalAddressBox) {
+      throw new Error("Expected visible client identity fields");
+    }
+
+    expect(legalNameBox.x).toBeCloseTo(postalAddressBox.x, 0);
+    expect(legalNameBox.width).toBeCloseTo(postalAddressBox.width, 0);
+  } finally {
+    await closeApp(electronApp);
+  }
+});
+
 test("an outside-scope draft autosaves, resumes after restart, and discards without using a number", async () => {
   const userDataPath = await createUserDataPath("invoice-draft");
   await writeFile(
