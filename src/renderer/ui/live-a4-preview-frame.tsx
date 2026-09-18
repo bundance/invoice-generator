@@ -6,9 +6,6 @@ type LiveA4PreviewFrameProps = Readonly<{
   documentId: string;
 }>;
 
-const a4WidthPixels = (210 / 25.4) * 96;
-const a4HeightPixels = (297 / 25.4) * 96;
-
 export function LiveA4PreviewFrame({ ariaLabel, children, documentId }: LiveA4PreviewFrameProps) {
   const frameRef = useRef<HTMLElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -20,15 +17,18 @@ export function LiveA4PreviewFrame({ ariaLabel, children, documentId }: LiveA4Pr
     const page = pageRef.current;
     const previewDocument = documentRef.current;
     const viewport = viewportRef.current;
-    if (!frame || !page || !previewDocument || !viewport) return;
+    const fixedPage = previewDocument?.querySelector<HTMLElement>("[data-fit-page]");
+    if (!frame || !page || !previewDocument || !viewport || !fixedPage) return;
 
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return;
       const { height, width } = entry.contentRect;
-      if (height <= 0 || width <= 0) return;
-      const scale = Math.min(width / a4WidthPixels, height / a4HeightPixels, 1);
-      page.style.height = `${a4HeightPixels * scale}px`;
-      page.style.width = `${a4WidthPixels * scale}px`;
+      const fixedPageHeight = fixedPage.offsetHeight;
+      const fixedPageWidth = fixedPage.offsetWidth;
+      if (height <= 0 || width <= 0 || fixedPageHeight <= 0 || fixedPageWidth <= 0) return;
+      const scale = Math.min(width / fixedPageWidth, height / fixedPageHeight, 1);
+      page.style.height = `${fixedPageHeight * scale}px`;
+      page.style.width = `${fixedPageWidth * scale}px`;
       previewDocument.style.transform = `scale(${scale})`;
       frame.removeAttribute("aria-busy");
     });

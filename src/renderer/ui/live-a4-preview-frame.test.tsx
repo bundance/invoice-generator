@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 
 import { LiveA4PreviewFrame } from "./live-a4-preview-frame.tsx";
 
-const a4WidthPixels = (210 / 25.4) * 96;
-const a4HeightPixels = (297 / 25.4) * 96;
+const fixedPageWidth = 794;
+const fixedPageHeight = 1123;
 
 describe("Live A4 preview frame", () => {
   beforeEach(() => {
@@ -20,48 +20,77 @@ describe("Live A4 preview frame", () => {
   it("fits and refits the fixed A4 page to its viewport without exceeding 100 percent", () => {
     const { container } = render(
       <LiveA4PreviewFrame ariaLabel="Invoice preview" documentId="Draft">
-        <article>Fixed invoice document</article>
+        <article data-fit-page>Fixed invoice document</article>
       </LiveA4PreviewFrame>,
     );
     const preview = screen.getByLabelText("Invoice preview");
     const page = container.querySelector<HTMLElement>(".live-a4-preview-page");
-    const document = container.querySelector<HTMLElement>(".live-a4-preview-document");
-    if (!page || !document) throw new Error("Expected the fitted page and fixed document");
+    const previewDocument = container.querySelector<HTMLElement>(".live-a4-preview-document");
+    const fixedPage = container.querySelector<HTMLElement>("[data-fit-page]");
+    if (!page || !previewDocument || !fixedPage) {
+      throw new Error("Expected the fitted page and fixed document");
+    }
+    setFixedPageLayoutSize(fixedPage);
 
     resizePreview({ height: 600, width: 600 });
 
-    const compactScale = 600 / a4HeightPixels;
+    const compactScale = 600 / fixedPageHeight;
     expect(preview).toHaveAttribute("data-preview-mode", "fit");
-    expect(Number.parseFloat(page.style.width)).toBeCloseTo(a4WidthPixels * compactScale, 4);
+    expect(Number.parseFloat(page.style.width)).toBeCloseTo(fixedPageWidth * compactScale, 4);
     expect(Number.parseFloat(page.style.height)).toBeCloseTo(600, 4);
-    expect(document.style.transform).toBe(`scale(${compactScale})`);
+    expect(previewDocument.style.transform).toBe(`scale(${compactScale})`);
     expect(Number.parseFloat(page.style.width) / Number.parseFloat(page.style.height)).toBeCloseTo(
       210 / 297,
-      5,
+      3,
     );
 
     resizePreview({ height: 900, width: 800 });
 
-    const tallScale = 900 / a4HeightPixels;
+    const tallScale = 900 / fixedPageHeight;
     expect(tallScale).toBeGreaterThan(0.65);
     expect(Number.parseFloat(page.style.height)).toBeCloseTo(900, 4);
-    expect(document.style.transform).toBe(`scale(${tallScale})`);
+    expect(previewDocument.style.transform).toBe(`scale(${tallScale})`);
 
     resizePreview({ height: 1600, width: 1000 });
 
-    expect(Number.parseFloat(page.style.width)).toBeCloseTo(a4WidthPixels, 4);
-    expect(Number.parseFloat(page.style.height)).toBeCloseTo(a4HeightPixels, 4);
-    expect(document.style.transform).toBe("scale(1)");
+    expect(Number.parseFloat(page.style.width)).toBeCloseTo(fixedPageWidth, 4);
+    expect(Number.parseFloat(page.style.height)).toBeCloseTo(fixedPageHeight, 4);
+    expect(previewDocument.style.transform).toBe("scale(1)");
+  });
+
+  it("fits the fixed A4 page to the available width when width is limiting", () => {
+    const { container } = render(
+      <LiveA4PreviewFrame ariaLabel="Invoice preview" documentId="Draft">
+        <article data-fit-page>Fixed invoice document</article>
+      </LiveA4PreviewFrame>,
+    );
+    const page = container.querySelector<HTMLElement>(".live-a4-preview-page");
+    const fixedPage = container.querySelector<HTMLElement>("[data-fit-page]");
+    if (!page || !fixedPage) throw new Error("Expected the fitted page and fixed document");
+    setFixedPageLayoutSize(fixedPage);
+
+    resizePreview({ height: 900, width: 600 });
+
+    expect(Number.parseFloat(page.style.width)).toBe(600);
+    expect(Number.parseFloat(page.style.height)).toBeLessThanOrEqual(900);
+    expect(Number.parseFloat(page.style.width) / Number.parseFloat(page.style.height)).toBeCloseTo(
+      210 / 297,
+      3,
+    );
   });
 
   it("commits a refit before the native resize callback returns", () => {
     const { container } = render(
       <LiveA4PreviewFrame ariaLabel="Invoice preview" documentId="Draft">
-        <article>Fixed invoice document</article>
+        <article data-fit-page>Fixed invoice document</article>
       </LiveA4PreviewFrame>,
     );
     const page = container.querySelector<HTMLElement>(".live-a4-preview-page");
-    if (!page || !activePreviewResize) throw new Error("Expected an observed fitted page");
+    const fixedPage = container.querySelector<HTMLElement>("[data-fit-page]");
+    if (!page || !fixedPage || !activePreviewResize) {
+      throw new Error("Expected an observed fitted page");
+    }
+    setFixedPageLayoutSize(fixedPage);
 
     activePreviewResize({ height: 600, width: 600 });
 
@@ -70,6 +99,13 @@ describe("Live A4 preview frame", () => {
 });
 
 type PreviewSize = Readonly<{ height: number; width: number }>;
+
+function setFixedPageLayoutSize(fixedPage: HTMLElement): void {
+  Object.defineProperties(fixedPage, {
+    offsetHeight: { configurable: true, value: fixedPageHeight },
+    offsetWidth: { configurable: true, value: fixedPageWidth },
+  });
+}
 
 let activePreviewResize: ((size: PreviewSize) => void) | null = null;
 

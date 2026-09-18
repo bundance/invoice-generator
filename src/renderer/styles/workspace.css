@@ -21,13 +21,13 @@
 }
 
 .live-a4-preview-frame {
-  --live-a4-preview-sticky-top: 92px;
-  --live-a4-preview-bottom-gap: 24px;
-
   position: sticky;
-  top: var(--live-a4-preview-sticky-top);
+  top: calc(var(--app-shell-top-bar-height) + var(--app-shell-sticky-gap));
   display: grid;
-  height: calc(100vh - var(--live-a4-preview-sticky-top) - var(--live-a4-preview-bottom-gap));
+  height: calc(
+    100vh - var(--app-shell-top-bar-height) - var(--app-shell-sticky-gap) -
+      var(--app-shell-sticky-gap)
+  );
   min-height: 0;
   grid-template-rows: auto minmax(0, 1fr);
 }
@@ -61,8 +61,6 @@
 }
 
 .live-a4-preview-document {
-  width: 210mm;
-  height: 297mm;
   transform-origin: top left;
 }
 
