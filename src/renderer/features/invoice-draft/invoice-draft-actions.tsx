@@ -6,6 +6,7 @@ import type { InvoiceDraftForm } from "./use-invoice-draft-form.ts";
 type InvoiceDraftActionsProps = Readonly<{
   draftForm: InvoiceDraftForm;
   onDiscard: () => void;
+  previewIsReady: boolean;
   reviewInProgress: boolean;
   selectedClient: Client | undefined;
   trigger: RefObject<HTMLButtonElement | null>;
@@ -14,6 +15,7 @@ type InvoiceDraftActionsProps = Readonly<{
 export function InvoiceDraftActions({
   draftForm,
   onDiscard,
+  previewIsReady,
   reviewInProgress,
   selectedClient,
   trigger,
@@ -27,7 +29,7 @@ export function InvoiceDraftActions({
           </button>
           <button
             className="primary-action"
-            disabled={reviewInProgress}
+            disabled={reviewInProgress || !previewIsReady}
             ref={trigger}
             type="submit"
           >

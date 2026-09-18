@@ -18,6 +18,11 @@ import {
 import { completeClient } from "../../../../tests/fixtures/client.ts";
 import { completeIssuedInvoice } from "../../../../tests/fixtures/issued-invoice.ts";
 import { completeIssuer } from "../../../../tests/fixtures/issuer-settings.ts";
+import {
+  createLoadedTestDocumentFonts,
+  createTestDocumentFonts,
+  setTestDocumentFonts,
+} from "../../../../tests/fixtures/test-document-fonts.ts";
 import App from "../../app/app.tsx";
 import {
   businessDate,
@@ -28,7 +33,38 @@ import {
 } from "../../app/app-test-support.ts";
 
 describe("outside-scope invoice draft", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    setTestDocumentFonts(createLoadedTestDocumentFonts());
+  });
+
+  it("keeps invoice review unavailable until the visible preview fonts are ready", async () => {
+    const fontLoad = deferred<void>();
+    setTestDocumentFonts(
+      createTestDocumentFonts({
+        load: async (face) => {
+          await fontLoad.promise;
+          face.status = "loaded";
+        },
+        status: "unloaded",
+      }),
+    );
+    window.invoiceApp = readyDraftBridge();
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("tab", { name: "Work" }));
+    await user.type(screen.getByLabelText("Notes"), "Work in progress");
+    expect(screen.getByRole("button", { name: "Review and issue" })).toBeDisabled();
+    expect(screen.getByText("Preparing document fonts…")).toBeVisible();
+
+    fontLoad.resolve();
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Review and issue" })).toBeEnabled(),
+    );
+    expect(screen.getByLabelText("Notes")).toHaveValue("Work in progress");
+  });
 
   it("autosaves editable client defaults and previews exact draft totals", async () => {
     const savedDrafts: InvoiceDraftInput[] = [];

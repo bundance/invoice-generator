@@ -2,9 +2,12 @@ import { coderneticWordmarkDataUrl } from "./codernetic-wordmark.ts";
 import { billingDocumentFontCss } from "./billing-document-fonts.ts";
 import type { BillingDocumentModel } from "./invoice-document-model.ts";
 
-type BillingDocumentProps = Readonly<{ model: BillingDocumentModel }>;
+type BillingDocumentProps = Readonly<{
+  embedFonts?: boolean;
+  model: BillingDocumentModel;
+}>;
 
-export function BillingDocument({ model }: BillingDocumentProps) {
+export function BillingDocument({ embedFonts = true, model }: BillingDocumentProps) {
   const heading = createDocumentHeading(model);
   const isCreditNote = model.kind === "credit-note";
   return (
@@ -15,7 +18,7 @@ export function BillingDocument({ model }: BillingDocumentProps) {
       }`}
       data-fit-page
     >
-      <style data-billing-document-fonts>{billingDocumentFontCss}</style>
+      {embedFonts ? <style data-billing-document-fonts>{billingDocumentFontCss}</style> : null}
       <header className="document-header" data-fit-region="header">
         <img
           alt="Codernetic"

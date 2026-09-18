@@ -27,7 +27,6 @@ import {
   billingDocumentFontSubsets,
   type BillingDocumentFontSubset,
 } from "../domain/validation/billing-document-text.ts";
-
 const regularSources = {
   "cyrillic-ext": arimoCyrillicExtRegular,
   cyrillic: arimoCyrillicRegular,
@@ -61,21 +60,62 @@ const boldSources = {
   latin: arimoLatinBold,
 } satisfies Readonly<Record<BillingDocumentFontSubset, string>>;
 
-export const billingDocumentFontFaceCount = billingDocumentFontSubsets.length * 3;
+export type BillingDocumentFontFace = Readonly<{
+  family: "Arimo";
+  source: string;
+  style: "italic" | "normal";
+  subset: BillingDocumentFontSubset;
+  unicodeRange: string;
+  weight: "400" | "700";
+}>;
 
-export const billingDocumentFontCss = billingDocumentFontSubsets
-  .flatMap(({ name, unicodeRange }) => [
-    fontFace({ source: regularSources[name], style: "normal", unicodeRange, weight: 400 }),
-    fontFace({ source: italicSources[name], style: "italic", unicodeRange, weight: 400 }),
-    fontFace({ source: boldSources[name], style: "normal", unicodeRange, weight: 700 }),
-  ])
+type BillingDocumentFontVariant = Readonly<{
+  sources: Readonly<Record<BillingDocumentFontSubset, string>>;
+  style: BillingDocumentFontFace["style"];
+  weight: BillingDocumentFontFace["weight"];
+}>;
+
+const fontVariants: readonly BillingDocumentFontVariant[] = [
+  { sources: regularSources, style: "normal", weight: "400" },
+  { sources: italicSources, style: "italic", weight: "400" },
+  { sources: boldSources, style: "normal", weight: "700" },
+];
+
+export const billingDocumentFontFaces: readonly BillingDocumentFontFace[] =
+  billingDocumentFontSubsets.flatMap(({ name: subset, unicodeRange }) =>
+    fontVariants.map(({ sources, style, weight }) => ({
+      family: "Arimo",
+      source: sources[subset],
+      style,
+      subset,
+      unicodeRange,
+      weight,
+    })),
+  );
+
+export const billingDocumentFontFaceCount = billingDocumentFontFaces.length;
+
+export const billingDocumentFontCss = billingDocumentFontFaces
+  .map(({ source, style, unicodeRange, weight }) =>
+    fontFace({ source, style, unicodeRange, weight }),
+  )
   .join("");
+
+export type BillingDocumentFonts = Readonly<{
+  css: string;
+  faces: readonly BillingDocumentFontFace[];
+}>;
+
+export const billingDocumentFonts: BillingDocumentFonts = {
+  css: billingDocumentFontCss,
+  faces: billingDocumentFontFaces,
+};
 
 type FontFaceOptions = Readonly<{
   source: string;
   style: "italic" | "normal";
   unicodeRange: string;
-  weight: 400 | 700;
+  weight: "400" | "700";
 }>;
 
 function fontFace({ source, style, unicodeRange, weight }: FontFaceOptions): string {
