@@ -27,6 +27,29 @@ import {
   test,
 } from "./support/electron-test-app.js";
 
+test("client legal name spans the inspector width", async () => {
+  const userDataPath = await createUserDataPath("client-legal-name-width");
+  const electronApp = await launchProductionApp(userDataPath);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await page.getByRole("button", { name: "Clients" }).click();
+    await page.getByRole("button", { name: "Create first client" }).click();
+
+    const [legalNameBox, postalAddressBox] = await Promise.all([
+      page.getByLabel("Legal name").boundingBox(),
+      page.getByLabel("Postal address").boundingBox(),
+    ]);
+    if (!legalNameBox || !postalAddressBox) {
+      throw new Error("Expected visible client identity fields");
+    }
+
+    expect(legalNameBox.width).toBeCloseTo(postalAddressBox.width, 0);
+  } finally {
+    await closeApp(electronApp);
+  }
+});
+
 test("a UI-created issuer and UK-taxable client can start an invoice", async () => {
   const userDataPath = await createUserDataPath("ui-created-invoice");
   const electronApp = await launchProductionApp(userDataPath);
