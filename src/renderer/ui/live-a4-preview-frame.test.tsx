@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { LiveA4PreviewFrame } from "./live-a4-preview-frame.tsx";
@@ -95,6 +96,142 @@ describe("Live A4 preview frame", () => {
     activePreviewResize({ height: 600, width: 600 });
 
     expect(Number.parseFloat(page.style.height)).toBeCloseTo(600, 4);
+  });
+
+  it("provides keyboard-operable zoom controls that leave Fit mode", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <LiveA4PreviewFrame ariaLabel="Invoice preview" documentId="Draft">
+        <article data-fit-page>Fixed invoice document</article>
+      </LiveA4PreviewFrame>,
+    );
+    const preview = screen.getByLabelText("Invoice preview");
+    const fixedPage = container.querySelector<HTMLElement>("[data-fit-page]");
+    const previewDocument = container.querySelector<HTMLElement>(".live-a4-preview-document");
+    if (!fixedPage || !previewDocument) {
+      throw new Error("Expected the fixed preview document");
+    }
+    setFixedPageLayoutSize(fixedPage);
+    resizePreview({ height: 600, width: 600 });
+
+    const fit = screen.getByRole("button", { name: "Fit preview" });
+    const zoomOut = screen.getByRole("button", { name: "Zoom out" });
+    expect(fit).toHaveAttribute("aria-pressed", "true");
+    expect(zoomOut).toBeEnabled();
+    expect(screen.getByLabelText("Current zoom")).toHaveTextContent("53%");
+
+    const zoomIn = screen.getByRole("button", { name: "Zoom in" });
+    await user.tab();
+    expect(fit).toHaveFocus();
+    await user.tab();
+    expect(zoomOut).toHaveFocus();
+    await user.tab();
+    expect(zoomIn).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    expect(preview).toHaveAttribute("data-preview-mode", "manual");
+    expect(screen.getByLabelText("Current zoom")).toHaveTextContent("63%");
+    expect(previewDocument.style.transform).toBe("scale(0.63)");
+
+    await user.tab({ shift: true });
+    expect(zoomOut).toHaveFocus();
+    await user.keyboard(" ");
+
+    expect(screen.getByLabelText("Current zoom")).toHaveTextContent("53%");
+    expect(previewDocument.style.transform).toBe("scale(0.53)");
+  });
+
+  it("keeps manual zoom fixed while resizing and restores responsive Fit", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <LiveA4PreviewFrame ariaLabel="Invoice preview" documentId="Draft">
+        <article data-fit-page>Fixed invoice document</article>
+      </LiveA4PreviewFrame>,
+    );
+    const fixedPage = container.querySelector<HTMLElement>("[data-fit-page]");
+    const page = container.querySelector<HTMLElement>(".live-a4-preview-page");
+    const previewDocument = container.querySelector<HTMLElement>(".live-a4-preview-document");
+    const viewport = container.querySelector<HTMLElement>(".live-a4-preview-viewport");
+    if (!fixedPage || !page || !previewDocument || !viewport) {
+      throw new Error("Expected the preview layout");
+    }
+    setFixedPageLayoutSize(fixedPage);
+    resizePreview({ height: 600, width: 600 });
+    await user.click(screen.getByRole("button", { name: "Zoom in" }));
+
+    resizePreview({ height: 900, width: 800 });
+
+    expect(screen.getByLabelText("Current zoom")).toHaveTextContent("63%");
+    expect(Number.parseFloat(page.style.width)).toBeCloseTo(fixedPageWidth * 0.63, 4);
+    expect(previewDocument.style.transform).toBe("scale(0.63)");
+
+    viewport.scrollLeft = 80;
+    viewport.scrollTop = 120;
+    await user.click(screen.getByRole("button", { name: "Fit preview" }));
+
+    const fitScale = 900 / fixedPageHeight;
+    expect(screen.getByLabelText("Current zoom")).toHaveTextContent("80%");
+    expect(Number.parseFloat(page.style.height)).toBeCloseTo(900, 4);
+    expect(previewDocument.style.transform).toBe(`scale(${fitScale})`);
+    expect(viewport.scrollLeft).toBe(0);
+    expect(viewport.scrollTop).toBe(0);
+  });
+
+  it("clamps manual zoom and disables each control at its bound", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <LiveA4PreviewFrame ariaLabel="Invoice preview" documentId="Draft">
+        <article data-fit-page>Fixed invoice document</article>
+      </LiveA4PreviewFrame>,
+    );
+    const fixedPage = container.querySelector<HTMLElement>("[data-fit-page]");
+    if (!fixedPage) throw new Error("Expected the fixed preview document");
+    setFixedPageLayoutSize(fixedPage);
+    resizePreview({ height: 1600, width: 1000 });
+    const zoomIn = screen.getByRole("button", { name: "Zoom in" });
+    const zoomOut = screen.getByRole("button", { name: "Zoom out" });
+
+    for (let step = 0; step < 10; step += 1) await user.click(zoomIn);
+
+    expect(screen.getByLabelText("Current zoom")).toHaveTextContent("200%");
+    expect(zoomIn).toBeDisabled();
+    expect(zoomOut).toBeEnabled();
+
+    for (let step = 0; step < 20; step += 1) await user.click(zoomOut);
+
+    expect(screen.getByLabelText("Current zoom")).toHaveTextContent("25%");
+    expect(zoomOut).toBeDisabled();
+    expect(zoomIn).toBeEnabled();
+  });
+
+  it("starts a different document preview in Fit mode", async () => {
+    const user = userEvent.setup();
+    const { container, rerender } = render(
+      <LiveA4PreviewFrame ariaLabel="Invoice preview" documentId="Draft">
+        <article data-fit-page>Fixed invoice document</article>
+      </LiveA4PreviewFrame>,
+    );
+    const firstFixedPage = container.querySelector<HTMLElement>("[data-fit-page]");
+    if (!firstFixedPage) throw new Error("Expected the fixed preview document");
+    setFixedPageLayoutSize(firstFixedPage);
+    resizePreview({ height: 600, width: 600 });
+    await user.click(screen.getByRole("button", { name: "Zoom in" }));
+
+    rerender(
+      <LiveA4PreviewFrame ariaLabel="Credit note preview" documentId="CN-GGIOHK-0043">
+        <article data-fit-page>Fixed credit-note document</article>
+      </LiveA4PreviewFrame>,
+    );
+    const nextFixedPage = container.querySelector<HTMLElement>("[data-fit-page]");
+    if (!nextFixedPage) throw new Error("Expected the next fixed preview document");
+    setFixedPageLayoutSize(nextFixedPage);
+    resizePreview({ height: 600, width: 600 });
+
+    expect(screen.getByLabelText("Credit note preview")).toHaveAttribute(
+      "data-preview-mode",
+      "fit",
+    );
+    expect(screen.getByLabelText("Current zoom")).toHaveTextContent("53%");
   });
 });
 

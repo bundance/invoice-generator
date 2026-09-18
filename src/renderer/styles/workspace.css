@@ -35,33 +35,96 @@
 
 .preview-toolbar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  gap: 10px 16px;
+  flex-wrap: wrap;
   padding: 0 2px 13px;
   color: #455047;
   font-size: 0.8rem;
   font-weight: 750;
 }
 
-.preview-toolbar small {
-  color: #778079;
+.preview-toolbar__identity {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 6px 10px;
+  flex-wrap: wrap;
+}
+
+.preview-toolbar__identity small {
+  color: #59615a;
   font-size: 0.72rem;
   font-weight: 600;
+}
+
+.preview-zoom-controls {
+  display: inline-flex;
+  min-inline-size: 0;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+}
+
+.preview-zoom-controls button {
+  display: grid;
+  min-width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid #b8c0b8;
+  border-radius: 7px;
+  padding: 0 8px;
+  background: #f8faf7;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.preview-zoom-controls button:hover:not(:disabled),
+.preview-zoom-controls button[aria-pressed="true"] {
+  border-color: #7e8980;
+  background: white;
+}
+
+.preview-zoom-controls button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.preview-zoom-controls svg {
+  width: 16px;
+  height: 16px;
+}
+
+.preview-zoom-controls output {
+  min-width: 4ch;
+  color: #455047;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .live-a4-preview-viewport {
   display: flex;
   min-width: 0;
   min-height: 0;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
   overflow: hidden;
+}
+
+.live-a4-preview-frame[data-preview-mode="manual"] .live-a4-preview-viewport {
+  overflow: auto;
 }
 
 .live-a4-preview-page {
   flex: none;
+  margin: auto;
 }
 
 .live-a4-preview-document {
+  width: max-content;
   transform-origin: top left;
 }
 
