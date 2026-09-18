@@ -13,6 +13,7 @@ type FormFieldProps<FieldName extends string> = Readonly<{
   readOnly?: boolean;
   registration: UseFormRegisterReturn<FieldName>;
   type?: "date" | "text";
+  wide?: boolean;
 }>;
 
 export function FormField<FieldName extends string>({
@@ -26,6 +27,7 @@ export function FormField<FieldName extends string>({
   readOnly = false,
   registration,
   type = "text",
+  wide = false,
 }: FormFieldProps<FieldName>) {
   const id = explicitId ?? (idPrefix ? `${idPrefix}-${registration.name}` : registration.name);
   const errorId = `${id}-error`;
@@ -38,7 +40,7 @@ export function FormField<FieldName extends string>({
   };
 
   return (
-    <div className={`settings-field${multiline ? " settings-field--wide" : ""}`}>
+    <div className={`settings-field${multiline || wide ? " settings-field--wide" : ""}`}>
       <label className="field-label" htmlFor={id}>
         {label}
       </label>

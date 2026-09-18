@@ -75,6 +75,7 @@ export function InvoiceClientFields({
         registration={draftForm.register("clientLegalName", {
           onBlur: () => onFieldBlur("clientLegalName"),
         })}
+        wide
       />
       <FormField
         error={errorFor("clientPostalAddress")}
