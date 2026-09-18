@@ -1,7 +1,10 @@
 .app-shell {
+  --app-shell-top-bar-height: 68px;
+  --app-shell-sticky-gap: 24px;
+
   display: grid;
   min-height: 100vh;
-  grid-template-rows: 68px minmax(0, 1fr);
+  grid-template-rows: var(--app-shell-top-bar-height) minmax(0, 1fr);
   background: #e8ebe6;
 }
 
@@ -10,7 +13,7 @@
   z-index: 10;
   top: 0;
   display: grid;
-  height: 68px;
+  height: var(--app-shell-top-bar-height);
   grid-template-columns: 200px 1fr 180px;
   align-items: center;
   padding: 0 24px;
