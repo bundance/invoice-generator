@@ -53,7 +53,7 @@ export function InvoiceDraftStudio({
   }
 
   return (
-    <BillingDocumentFontGate active fonts={billingDocumentFonts}>
+    <BillingDocumentFontGate fonts={billingDocumentFonts}>
       {(fontReadiness) => (
         <div className="document-studio">
           <InvoicePreview fontReadiness={fontReadiness} issuer={issuer} review={review} />

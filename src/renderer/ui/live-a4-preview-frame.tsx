@@ -1,10 +1,7 @@
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { type ReactNode, useEffect, useEffectEvent, useRef, useState } from "react";
 
-export type PreviewFontReadiness = Readonly<{
-  restart: () => void;
-  status: "failed" | "loading" | "ready";
-}>;
+import type { BillingDocumentFontReadiness } from "./billing-document-font-gate.tsx";
 
 const minimumZoomPercent = 25;
 const maximumZoomPercent = 200;
@@ -25,7 +22,7 @@ type LiveA4PreviewFrameProps = Readonly<{
   ariaLabel: string;
   children: ReactNode;
   documentId: string;
-  fontReadiness: PreviewFontReadiness;
+  fontReadiness: BillingDocumentFontReadiness;
 }>;
 
 const fitZoom: PreviewZoom = { mode: "fit" };

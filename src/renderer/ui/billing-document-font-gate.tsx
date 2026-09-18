@@ -4,20 +4,22 @@ import type {
   BillingDocumentFontFace,
   BillingDocumentFonts,
 } from "../../documents/billing-document-fonts.ts";
-import type { PreviewFontReadiness } from "./live-a4-preview-frame.tsx";
+
+export type BillingDocumentFontReadiness = Readonly<{
+  restart: () => void;
+  status: "failed" | "loading" | "ready";
+}>;
 
 type BillingDocumentFontGateProps = Readonly<{
-  active: boolean;
-  children: (readiness: PreviewFontReadiness) => ReactNode;
+  children: (readiness: BillingDocumentFontReadiness) => ReactNode;
   fonts: BillingDocumentFonts;
 }>;
 
-export function BillingDocumentFontGate({ active, children, fonts }: BillingDocumentFontGateProps) {
+export function BillingDocumentFontGate({ children, fonts }: BillingDocumentFontGateProps) {
   const [attempt, setAttempt] = useState(0);
-  const [status, setStatus] = useState<PreviewFontReadiness["status"]>("loading");
+  const [status, setStatus] = useState<BillingDocumentFontReadiness["status"]>("loading");
 
   useEffect(() => {
-    if (!active) return;
     let current = true;
     void loadDocumentFonts(document.fonts, fonts.faces).then(
       () => {
@@ -30,7 +32,7 @@ export function BillingDocumentFontGate({ active, children, fonts }: BillingDocu
     return () => {
       current = false;
     };
-  }, [active, attempt, fonts]);
+  }, [attempt, fonts]);
 
   function restart(): void {
     setStatus("loading");

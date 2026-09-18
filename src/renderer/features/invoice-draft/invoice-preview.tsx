@@ -2,10 +2,11 @@ import { BillingDocument } from "../../../documents/invoice-document.tsx";
 import { createDraftInvoiceDocumentModel } from "../../../documents/invoice-document-model.ts";
 import type { InvoiceDraftReview } from "../../../domain/invoices/invoice-draft.ts";
 import type { IssuerSettings } from "../../../domain/issuer/issuer-settings.ts";
-import { LiveA4PreviewFrame, type PreviewFontReadiness } from "../../ui/live-a4-preview-frame.tsx";
+import type { BillingDocumentFontReadiness } from "../../ui/billing-document-font-gate.tsx";
+import { LiveA4PreviewFrame } from "../../ui/live-a4-preview-frame.tsx";
 
 type InvoicePreviewProps = Readonly<{
-  fontReadiness: PreviewFontReadiness;
+  fontReadiness: BillingDocumentFontReadiness;
   issuer: IssuerSettings;
   review: InvoiceDraftReview;
 }>;

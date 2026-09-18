@@ -240,7 +240,7 @@ function TestPreview({
   showRestart = false,
 }: TestPreviewProps) {
   return (
-    <BillingDocumentFontGate active fonts={billingDocumentFonts}>
+    <BillingDocumentFontGate fonts={billingDocumentFonts}>
       {(fontReadiness) => {
         onReadyChange?.(fontReadiness.status === "ready");
         return (
