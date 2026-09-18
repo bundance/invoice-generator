@@ -14,7 +14,7 @@
 .launch-state--error > svg {
   width: 42px;
   height: 42px;
-  margin-bottom: 20px;
+  grid-area: icon;
   color: var(--accent-dark);
 }
 
@@ -24,10 +24,25 @@
 
 .recovery-screen {
   grid-template-columns: minmax(0, 560px);
+  grid-template-areas:
+    "icon"
+    "."
+    "eyebrow"
+    "."
+    "heading"
+    "."
+    "problem"
+    "."
+    "guidance"
+    "."
+    "actions"
+    "status"
+    ".";
+  grid-template-rows: auto 20px auto 8px auto 8px auto 16px auto 32px auto minmax(1.5em, auto) 16px;
 }
 
 .launch-state--error .recovery-screen__eyebrow {
-  margin: 0 0 8px;
+  grid-area: eyebrow;
   color: var(--accent-dark);
   font-size: 0.78rem;
   font-weight: 700;
@@ -35,13 +50,26 @@
   text-transform: uppercase;
 }
 
+.recovery-screen h1 {
+  grid-area: heading;
+}
+
+.recovery-screen__problem {
+  grid-area: problem;
+}
+
+.recovery-screen__guidance {
+  grid-area: guidance;
+}
+
 .recovery-screen__actions {
   display: flex;
+  grid-area: actions;
   gap: 12px;
   justify-content: center;
-  margin-top: 16px;
 }
 
 .recovery-screen__status {
+  grid-area: status;
   min-height: 1.5em;
 }

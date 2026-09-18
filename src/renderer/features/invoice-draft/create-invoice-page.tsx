@@ -119,10 +119,14 @@ function SetupWorkspace({ onDestinationChange, requirements }: SetupWorkspacePro
           <p>Your invoice preview will appear here after issuer and client setup.</p>
         </div>
       </section>
-      <aside className="inspector" aria-labelledby="setup-heading">
-        <p className="eyebrow">Before your first invoice</p>
-        <h2 id="setup-heading">Set up your workspace</h2>
-        <p>Complete the remaining setup before creating an invoice.</p>
+      <aside className="inspector setup-inspector" aria-labelledby="setup-heading">
+        <div className="setup-copy">
+          <p className="eyebrow">Before your first invoice</p>
+          <div className="setup-copy__summary">
+            <h2 id="setup-heading">Set up your workspace</h2>
+            <p>Complete the remaining setup before creating an invoice.</p>
+          </div>
+        </div>
         <ol className="setup-steps">
           {requirements.map(({ description, icon: Icon, title }) => (
             <li key={title}>

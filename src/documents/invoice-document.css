@@ -16,12 +16,76 @@
   line-height: 1.2;
 }
 
+.invoice-document {
+  display: grid;
+  grid-template:
+    "header" auto
+    "." 22mm
+    "meta" auto
+    "." 12mm
+    "table" auto
+    "notes" 20mm
+    "." 3mm
+    "footer" auto / 1fr;
+  align-content: start;
+}
+
+.invoice-document--sterling-vat {
+  grid-template:
+    "header" auto
+    "." 22mm
+    "meta" auto
+    "." 12mm
+    "table" auto
+    "." 20px
+    "sterling-vat" auto
+    "notes" 15mm
+    "." 3mm
+    "footer" auto / 1fr;
+}
+
+.invoice-document:has(.credit-note-link) {
+  grid-template:
+    "header" auto
+    "." 4mm
+    "meta" auto
+    "." 3mm
+    "credit-link" 14mm
+    "." 3mm
+    "table" auto
+    "credit-reason" 12mm
+    "notes" 20mm
+    "." 3mm
+    "footer" auto / 1fr;
+}
+
+.invoice-document--sterling-vat:has(.credit-note-link) {
+  grid-template:
+    "header" auto
+    "." 4mm
+    "meta" auto
+    "." 3mm
+    "credit-link" 14mm
+    "." 3mm
+    "table" auto
+    "credit-reason" 12mm
+    "." 20px
+    "sterling-vat" auto
+    "notes" 15mm
+    "." 3mm
+    "footer" auto / 1fr;
+}
+
 .document-header,
 .document-meta {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 14mm;
+}
+
+.document-header {
+  grid-area: header;
 }
 
 .document-logo {
@@ -41,12 +105,8 @@
 }
 
 .document-meta {
-  margin-top: 22mm;
+  grid-area: meta;
   line-height: 1.42;
-}
-
-.invoice-document:has(.credit-note-link) .document-meta {
-  margin-top: 4mm;
 }
 
 .client-address {
@@ -64,7 +124,11 @@
 }
 
 .document-title {
+  display: grid;
   min-width: 67mm;
+  align-content: start;
+  justify-items: end;
+  gap: 2.2mm;
   text-align: right;
 }
 
@@ -85,7 +149,6 @@
 .document-title strong,
 .document-title small {
   display: block;
-  margin-top: 2.2mm;
 }
 
 .document-title small {
@@ -94,8 +157,8 @@
 }
 
 .document-table {
+  grid-area: table;
   width: 100%;
-  margin-top: 12mm;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 9pt;
@@ -110,18 +173,15 @@
 }
 
 .credit-note-link {
+  grid-area: credit-link;
   height: 14mm;
-  margin-top: 3mm;
   padding: 2.5mm 3mm;
   border: 0.35mm solid #b9c6bd;
   background: #f4f7f4;
 }
 
-.credit-note-link + .document-table {
-  margin-top: 3mm;
-}
-
 .credit-note-reason {
+  grid-area: credit-reason;
   height: 12mm;
   padding-top: 3mm;
   white-space: pre-line;
@@ -222,7 +282,11 @@
 }
 
 .document-notes {
+  display: grid;
+  grid-area: notes;
   height: 20mm;
+  align-content: start;
+  gap: 1.5mm;
   overflow: hidden;
   padding-top: 4mm;
   font-size: 8.7pt;
@@ -230,7 +294,9 @@
 }
 
 .document-sterling-vat {
-  margin-top: 20px;
+  display: grid;
+  grid-area: sterling-vat;
+  gap: 5px;
   padding: 12px 14px;
   border: 1px solid #b9c6bd;
   background: #f4f7f4;
@@ -244,7 +310,7 @@
 }
 
 .document-sterling-vat h3 {
-  margin-bottom: 7px;
+  padding-bottom: 2px;
   font-size: 11px;
   text-transform: uppercase;
 }
@@ -264,21 +330,17 @@
   font-weight: 700;
 }
 
-.document-sterling-vat p {
-  margin-top: 5px;
-}
-
 .document-sterling-vat__evidence {
   white-space: pre-line;
 }
 
 .document-notes p {
-  margin: 0 0 1.5mm;
+  margin: 0;
   white-space: pre-line;
 }
 
 .document-footer {
-  margin-top: 3mm;
+  grid-area: footer;
   text-align: center;
   font-size: 8.7pt;
   line-height: 1.45;

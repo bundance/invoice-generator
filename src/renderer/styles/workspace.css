@@ -16,6 +16,7 @@
 }
 
 .preview-panel {
+  display: grid;
   padding: 16px;
   background: #dfe4dd;
 }
@@ -69,40 +70,20 @@
 }
 
 .invoice-paper {
-  display: flex;
+  display: grid;
   width: min(100%, 620px);
   aspect-ratio: 210 / 297;
-  margin: 0 auto;
-  flex-direction: column;
+  grid-template-rows: auto 1fr;
+  justify-self: center;
   padding: 48px 50px;
   border: 1px solid #d3d7d1;
   background: var(--paper);
   box-shadow: 0 8px 24px rgb(38 49 41 / 12%);
 }
 
-.paper-lines {
-  display: grid;
-  gap: 12px;
-  margin-top: 110px;
-}
-
-.paper-lines span {
-  display: block;
-  height: 1px;
-  background: #e7eae6;
-}
-
-.paper-lines span:nth-child(2) {
-  width: 65%;
-}
-
-.paper-lines span:nth-child(3) {
-  width: 84%;
-}
-
 .invoice-paper p {
   width: 27ch;
-  margin: auto;
+  place-self: center;
   color: #838b84;
   text-align: center;
   line-height: 1.6;
@@ -115,11 +96,11 @@
 .inspector h2,
 .empty-state h2,
 .settings-card h2 {
-  margin-bottom: 10px;
   font-size: 1.35rem;
 }
 
 .inspector > p:not(.eyebrow),
+.setup-copy__summary > p,
 .empty-state > p,
 .settings-card p:not(.eyebrow) {
   color: var(--muted);
@@ -131,10 +112,26 @@
   font-weight: 750;
 }
 
+.setup-inspector {
+  display: grid;
+  align-content: start;
+  gap: 28px;
+}
+
+.setup-copy {
+  display: grid;
+  gap: 7px;
+}
+
+.setup-copy__summary {
+  display: grid;
+  gap: 10px;
+}
+
 .setup-steps {
   display: grid;
   gap: 16px;
-  margin: 28px 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -143,6 +140,11 @@
   display: grid;
   grid-template-columns: 36px 1fr;
   gap: 12px;
+}
+
+.setup-steps li > div {
+  display: grid;
+  gap: 4px;
 }
 
 .setup-steps svg {
@@ -156,7 +158,6 @@
 }
 
 .setup-steps span {
-  margin-top: 4px;
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.45;
@@ -198,6 +199,14 @@
 .empty-state {
   display: grid;
   min-height: 430px;
+  grid-template:
+    "icon" auto
+    "." 22px
+    "heading" auto
+    "." 10px
+    "description" auto
+    "." 12px
+    "action" auto / auto;
   place-items: center;
   align-content: center;
   padding: 64px;
@@ -208,7 +217,7 @@
   display: grid;
   width: 58px;
   height: 58px;
-  margin-bottom: 22px;
+  grid-area: icon;
   place-items: center;
   border-radius: 16px;
   color: var(--accent-dark);
@@ -220,6 +229,14 @@
   height: 28px;
 }
 
+.empty-state h2 {
+  grid-area: heading;
+}
+
+.empty-state > p {
+  grid-area: description;
+}
+
 .empty-state .primary-action {
-  margin-top: 12px;
+  grid-area: action;
 }

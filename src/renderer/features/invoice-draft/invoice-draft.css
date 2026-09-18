@@ -23,7 +23,12 @@
 
 .draft-inspector-header h2,
 .draft-inspector-header p {
-  margin-bottom: 0;
+  margin: 0;
+}
+
+.draft-inspector-header > div {
+  display: grid;
+  gap: 7px;
 }
 
 .draft-context {
@@ -105,8 +110,13 @@
 }
 
 .validation-summary ul {
-  margin: 8px 0 0;
+  margin: 0;
   padding-left: 19px;
+}
+
+.validation-summary:has(ul) {
+  display: grid;
+  gap: 8px;
 }
 
 .validation-summary a {
@@ -132,10 +142,14 @@
 }
 
 .issue-help {
-  margin: -10px 0 0;
   color: var(--muted);
   font-size: 0.74rem;
   line-height: 1.4;
+}
+
+.draft-action-help {
+  display: grid;
+  gap: 10px;
 }
 
 .draft-save-error {
@@ -175,20 +189,32 @@
 }
 
 .draft-dialog h2 {
-  margin-bottom: 10px;
+  margin: 0;
 }
 
 .draft-dialog > p:not(.eyebrow) {
-  margin-bottom: 22px;
   color: var(--muted);
   line-height: 1.55;
+}
+
+.draft-dialog > .eyebrow {
+  padding-bottom: 7px;
+}
+
+.draft-dialog > h2 + p:not(.issue-effect, .validation-warning) {
+  padding-block: 10px 22px;
 }
 
 .issue-facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
-  margin: 20px 0;
+  padding-block: 20px;
+}
+
+.issue-facts > div {
+  display: grid;
+  gap: 4px;
 }
 
 .issue-facts dt {
@@ -199,7 +225,6 @@
 }
 
 .issue-facts dd {
-  margin: 4px 0 0;
   font-size: 0.84rem;
 }
 
@@ -207,13 +232,13 @@
   display: flex;
   align-items: flex-start;
   gap: 9px;
-  margin: 14px 0;
+  padding-block: 14px;
   font-size: 0.8rem;
   line-height: 1.4;
 }
 
 .issue-effect {
-  padding-top: 14px;
+  padding-block: 14px 16px;
   border-top: 1px solid var(--line);
 }
 .replacement-draft-notice {

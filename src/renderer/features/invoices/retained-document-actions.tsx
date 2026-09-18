@@ -23,7 +23,7 @@ export function RetainedDocumentActions({ documentId }: RetainedDocumentActionsP
   }
 
   return (
-    <>
+    <div className="retained-document-actions">
       <div className="invoice-history-actions">
         <button
           aria-label={`Open ${documentId}`}
@@ -70,6 +70,6 @@ export function RetainedDocumentActions({ documentId }: RetainedDocumentActionsP
           {feedback}
         </p>
       ) : null}
-    </>
+    </div>
   );
 }
