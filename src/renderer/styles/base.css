@@ -32,8 +32,11 @@ textarea:focus-visible {
 
 h1,
 h2,
-p {
-  margin-top: 0;
+h3,
+p,
+dl,
+dd {
+  margin: 0;
 }
 .sterling-vat-facts__evidence {
   white-space: pre-line;

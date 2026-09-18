@@ -22,11 +22,15 @@ export function SettingsPage({ appVersion, issuer, issuerSettingsForm }: Setting
       <div className="settings-layout">
         <form className="settings-form" noValidate onSubmit={submit}>
           <header className="settings-form-header">
-            <div>
+            <div className="settings-form-heading">
               <p className="eyebrow">Fixed invoice identity</p>
-              <h2>Issuer and payment details</h2>
-              <p>Changes apply to future documents. Issued documents stay unchanged.</p>
-              {issuer ? null : <p className="next-step">Next: add issuer details.</p>}
+              <div className="settings-form-copy">
+                <h2>Issuer and payment details</h2>
+                <div>
+                  <p>Changes apply to future documents. Issued documents stay unchanged.</p>
+                  {issuer ? null : <p className="next-step">Next: add issuer details.</p>}
+                </div>
+              </div>
             </div>
             <FormSaveStatus
               label={

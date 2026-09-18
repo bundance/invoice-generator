@@ -20,18 +20,25 @@ export function InvoiceDraftActions({
 }: InvoiceDraftActionsProps) {
   return (
     <>
-      <div className="draft-actions">
-        <button className="secondary-action" onClick={onDiscard} type="button">
-          Discard draft
-        </button>
-        <button className="primary-action" disabled={reviewInProgress} ref={trigger} type="submit">
-          {reviewInProgress ? "Reviewing…" : "Review and issue"}
-        </button>
+      <div className="draft-action-help">
+        <div className="draft-actions">
+          <button className="secondary-action" onClick={onDiscard} type="button">
+            Discard draft
+          </button>
+          <button
+            className="primary-action"
+            disabled={reviewInProgress}
+            ref={trigger}
+            type="submit"
+          >
+            {reviewInProgress ? "Reviewing…" : "Review and issue"}
+          </button>
+        </div>
+        <p className="issue-help">
+          Reviewing validates this draft. Only the final issue action can consume{" "}
+          {proposedInvoiceId(selectedClient)}.
+        </p>
       </div>
-      <p className="issue-help">
-        Reviewing validates this draft. Only the final issue action can consume{" "}
-        {proposedInvoiceId(selectedClient)}.
-      </p>
       {draftForm.saveStatus === "error" ? (
         <div className="draft-save-error">
           <p>Could not save draft. Your edits are still here.</p>

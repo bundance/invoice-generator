@@ -34,6 +34,7 @@
 .wordmark {
   display: flex;
   align-items: baseline;
+  gap: 10px;
 }
 
 .wordmark strong,
@@ -42,7 +43,6 @@
 }
 
 .wordmark small {
-  margin-left: 10px;
   color: #7c847e;
   font-family: inherit;
   font-size: 0.62rem;
@@ -103,17 +103,25 @@
 }
 
 .workspace {
+  display: grid;
   min-width: 0;
+  align-content: start;
+  gap: 24px;
   padding: 34px 38px 80px;
 }
 
 .page-header {
-  margin-bottom: 24px;
+  display: grid;
+  gap: 7px;
+}
+
+.page-header__copy {
+  display: grid;
+  gap: 8px;
 }
 
 .page-header h1,
 .launch-state h1 {
-  margin-bottom: 8px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(2.25rem, 4vw, 3.4rem);
   font-weight: 500;
@@ -121,15 +129,13 @@
   line-height: 1.05;
 }
 
-.page-header > p:last-child {
+.page-header__copy > p {
   max-width: 720px;
-  margin-bottom: 0;
   color: var(--muted);
   line-height: 1.55;
 }
 
 .eyebrow {
-  margin-bottom: 7px;
   color: var(--accent-dark);
   font-size: 0.7rem;
   font-weight: 800;

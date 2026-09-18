@@ -71,11 +71,13 @@ export function ClientInvoiceDefaultFields({
               registration={register("outsideScopeEvidenceReference")}
             />
             <label className="client-check-field">
-              <input
-                aria-label="Reverse charge applies"
-                type="checkbox"
-                {...register("reverseCharge")}
-              />
+              <span className="client-check-control">
+                <input
+                  aria-label="Reverse charge applies"
+                  type="checkbox"
+                  {...register("reverseCharge")}
+                />
+              </span>
               <span>
                 <strong>Reverse charge applies</strong>
                 <small>Add the approved wording for the country of receipt.</small>

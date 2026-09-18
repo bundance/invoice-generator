@@ -8,8 +8,10 @@ export function PageHeader({ eyebrow, heading, summary }: PageHeaderProps) {
   return (
     <header className="page-header">
       <p className="eyebrow">{eyebrow}</p>
-      <h1>{heading}</h1>
-      <p>{summary}</p>
+      <div className="page-header__copy">
+        <h1>{heading}</h1>
+        <p>{summary}</p>
+      </div>
     </header>
   );
 }

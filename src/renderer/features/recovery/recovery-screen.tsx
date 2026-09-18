@@ -82,8 +82,8 @@ export function RecoveryScreen({ problem }: RecoveryScreenProps) {
       <HardDriveDownload aria-hidden="true" />
       <p className="recovery-screen__eyebrow">{problemCopy.title}</p>
       <h1>Recovery required</h1>
-      <p>{problemCopy.message}</p>
-      <p>
+      <p className="recovery-screen__problem">{problemCopy.message}</p>
+      <p className="recovery-screen__guidance">
         {state.kind === "reloading"
           ? "The validated backup has replaced the complete dataset."
           : "Your existing files have not been changed. Select a complete validated backup or quit."}

@@ -106,8 +106,12 @@
   display: block;
 }
 
+.client-row > span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+}
+
 .client-row small {
-  margin-top: 4px;
   color: var(--muted);
 }
 
@@ -125,14 +129,18 @@
   border-bottom: 1px solid var(--line);
 }
 
-.client-editor > header h2 {
-  margin-bottom: 8px;
+.client-editor-heading {
+  display: grid;
+  gap: 7px;
+}
+
+.client-editor-copy {
+  display: grid;
+  gap: 8px;
 }
 
 .client-editor > header p:not(.eyebrow, .save-status),
-.fieldset-help,
-.selection-note {
-  margin-bottom: 0;
+.fieldset-help {
   color: var(--muted);
   line-height: 1.5;
 }
@@ -144,7 +152,7 @@
 }
 
 .fieldset-help {
-  margin: 0 0 14px;
+  padding-bottom: 14px;
   font-size: 0.8rem;
 }
 
@@ -161,8 +169,9 @@
   padding: 10px 0;
 }
 
-.client-check-field input {
-  margin-top: 3px;
+.client-check-control {
+  display: grid;
+  padding-top: 3px;
 }
 
 .client-check-field strong,
@@ -170,8 +179,12 @@
   display: block;
 }
 
+.client-check-field > span:last-child {
+  display: grid;
+  gap: 4px;
+}
+
 .client-check-field small {
-  margin-top: 4px;
   color: var(--muted);
 }
 
@@ -180,38 +193,4 @@
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-}
-
-.create-client-select {
-  margin: 24px 0;
-}
-
-.client-defaults {
-  display: grid;
-  gap: 0;
-  margin: 0 0 20px;
-}
-
-.client-defaults div {
-  display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.client-defaults dt {
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 750;
-}
-
-.client-defaults dd {
-  margin: 0;
-  font-size: 0.82rem;
-  font-weight: 750;
-}
-
-.selection-note {
-  font-size: 0.78rem;
 }

@@ -145,10 +145,12 @@ function ClientEditorHeader({ mode, saveStatus }: ClientEditorHeaderProps) {
   const content = clientEditorHeaderContent(mode);
   return (
     <header>
-      <div>
+      <div className="client-editor-heading">
         <p className="eyebrow">Client details</p>
-        <h2>{content.heading}</h2>
-        <p>{content.description}</p>
+        <div className="client-editor-copy">
+          <h2>{content.heading}</h2>
+          <p>{content.description}</p>
+        </div>
       </div>
       <FormSaveStatus label={clientSaveStatusLabels[saveStatus]} status={saveStatus} />
     </header>
