@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
@@ -13,11 +13,70 @@ import {
   completeIssuedInvoice,
 } from "../../../../tests/fixtures/issued-invoice.js";
 import { completeIssuer } from "../../../../tests/fixtures/issuer-settings.js";
-import { businessDate, unusedInvoiceAppCommands } from "../../app/app-test-support.js";
+import {
+  createLoadedTestDocumentFonts,
+  createTestDocumentFonts,
+  setTestDocumentFonts,
+} from "../../../../tests/fixtures/test-document-fonts.js";
+import { businessDate, deferred, unusedInvoiceAppCommands } from "../../app/app-test-support.js";
 import App from "../../app/app.js";
 
 describe("full credit note flow", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    setTestDocumentFonts(createLoadedTestDocumentFonts());
+  });
+
+  it("keeps credit-note review unavailable until the visible preview fonts are ready", async () => {
+    const fontLoad = deferred<void>();
+    setTestDocumentFonts(
+      createTestDocumentFonts({
+        load: async (face) => {
+          await fontLoad.promise;
+          face.status = "loaded";
+        },
+        status: "unloaded",
+      }),
+    );
+    window.invoiceApp = {
+      ...unusedInvoiceAppCommands,
+      loadWorkspace: () =>
+        Promise.resolve({
+          kind: "ready",
+          workspace: {
+            appVersion: "0.1.0",
+            clients: [completeClient],
+            creditNotes: [],
+            currentBusinessDate: businessDate,
+            draft: null,
+            issuedInvoices: [completeIssuedInvoice],
+            issuer: completeIssuer,
+          },
+        }),
+      saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
+    };
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Invoices" }));
+    const original = screen.getByRole("article", { name: "Invoice GGIOHK-0043" });
+    await user.click(within(original).getByRole("button", { name: "Correct GGIOHK-0043" }));
+    await user.type(
+      screen.getByLabelText("Correction reason"),
+      "The billed service period was incorrect.",
+    );
+
+    const reviewButton = screen.getByRole("button", { name: "Review and issue credit note" });
+    expect(reviewButton).toBeDisabled();
+    expect(screen.getByText("Preparing document fonts…")).toBeVisible();
+
+    fontLoad.resolve();
+
+    await waitFor(() => expect(reviewButton).toBeEnabled());
+    expect(screen.getByLabelText("Correction reason")).toHaveValue(
+      "The billed service period was incorrect.",
+    );
+  });
 
   it("reviews, cancels, and then issues one full credit without changing the original", async () => {
     const issueInputs: Array<Readonly<{ id: string; issueDate: string; reason: string }>> = [];

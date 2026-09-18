@@ -1,6 +1,8 @@
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { type ReactNode, useEffect, useEffectEvent, useRef, useState } from "react";
 
+import type { BillingDocumentFontReadiness } from "./billing-document-font-gate.tsx";
+
 const minimumZoomPercent = 25;
 const maximumZoomPercent = 200;
 const zoomStepPercent = 10;
@@ -9,7 +11,6 @@ type PreviewZoom = Readonly<{ mode: "fit" }> | Readonly<{ mode: "manual"; percen
 type PreviewSize = Readonly<{ height: number; width: number }>;
 type PreviewLayout = Readonly<{
   fixedPage: HTMLElement;
-  frame: HTMLElement;
   output: HTMLOutputElement;
   page: HTMLDivElement;
   previewDocument: HTMLDivElement;
@@ -21,6 +22,7 @@ type LiveA4PreviewFrameProps = Readonly<{
   ariaLabel: string;
   children: ReactNode;
   documentId: string;
+  fontReadiness: BillingDocumentFontReadiness;
 }>;
 
 const fitZoom: PreviewZoom = { mode: "fit" };
@@ -29,8 +31,12 @@ export function LiveA4PreviewFrame(props: LiveA4PreviewFrameProps) {
   return <MountedLiveA4PreviewFrame {...props} key={props.documentId} />;
 }
 
-function MountedLiveA4PreviewFrame({ ariaLabel, children, documentId }: LiveA4PreviewFrameProps) {
-  const frameRef = useRef<HTMLElement>(null);
+function MountedLiveA4PreviewFrame({
+  ariaLabel,
+  children,
+  documentId,
+  fontReadiness,
+}: LiveA4PreviewFrameProps) {
   const layoutRef = useRef<PreviewLayout>(null);
   const outputRef = useRef<HTMLOutputElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -43,19 +49,17 @@ function MountedLiveA4PreviewFrame({ ariaLabel, children, documentId }: LiveA4Pr
   });
 
   useEffect(() => {
-    const frame = frameRef.current;
     const output = outputRef.current;
     const page = pageRef.current;
     const previewDocument = documentRef.current;
     const viewport = viewportRef.current;
     const fixedPage = previewDocument?.querySelector<HTMLElement>("[data-fit-page]");
-    if (!frame || !output || !page || !previewDocument || !viewport || !fixedPage) return;
+    if (!output || !page || !previewDocument || !viewport || !fixedPage) return;
 
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return;
       const layout = {
         fixedPage,
-        frame,
         output,
         page,
         previewDocument,
@@ -93,11 +97,11 @@ function MountedLiveA4PreviewFrame({ ariaLabel, children, documentId }: LiveA4Pr
 
   return (
     <section
-      aria-busy="true"
+      aria-busy={fontReadiness.status === "ready" ? undefined : "true"}
       aria-label={ariaLabel}
       className="preview-panel live-a4-preview-frame"
+      data-font-status={fontReadiness.status}
       data-preview-mode={zoom.mode}
-      ref={frameRef}
     >
       <div className="preview-toolbar">
         <div className="preview-toolbar__identity">
@@ -135,8 +139,25 @@ function MountedLiveA4PreviewFrame({ ariaLabel, children, documentId }: LiveA4Pr
         </fieldset>
       </div>
       <div className="live-a4-preview-viewport" ref={viewportRef}>
+        {fontReadiness.status === "loading" ? (
+          <output className="live-a4-preview-font-status">Preparing document fonts…</output>
+        ) : null}
+        {fontReadiness.status === "failed" ? (
+          <div className="live-a4-preview-font-status" role="alert">
+            <p>The document fonts could not be prepared.</p>
+            <button
+              aria-label="Retry document fonts"
+              className="secondary-action"
+              onClick={fontReadiness.restart}
+              type="button"
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
         <div className="live-a4-preview-page" ref={pageRef} style={{ height: 0, width: 0 }}>
           <div
+            aria-hidden={fontReadiness.status === "ready" ? undefined : "true"}
             className="live-a4-preview-document"
             ref={documentRef}
             style={{ transform: "scale(0)" }}
@@ -151,7 +172,7 @@ function MountedLiveA4PreviewFrame({ ariaLabel, children, documentId }: LiveA4Pr
 
 /** Keeps geometry and the readout in sync even when React defers renders during native resize. */
 function applyPreviewZoom(layout: PreviewLayout, zoom: PreviewZoom): number {
-  const { fixedPage, frame, output, page, previewDocument, size, viewport } = layout;
+  const { fixedPage, output, page, previewDocument, size, viewport } = layout;
   const fixedPageHeight = fixedPage.offsetHeight;
   const fixedPageWidth = fixedPage.offsetWidth;
   if (size.height <= 0 || size.width <= 0 || fixedPageHeight <= 0 || fixedPageWidth <= 0) return 1;
@@ -168,6 +189,5 @@ function applyPreviewZoom(layout: PreviewLayout, zoom: PreviewZoom): number {
     viewport.scrollLeft = 0;
     viewport.scrollTop = 0;
   }
-  frame.removeAttribute("aria-busy");
   return scale;
 }

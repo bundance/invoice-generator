@@ -26,6 +26,7 @@ type InvoiceDraftInspectorProps = Readonly<{
   draftForm: InvoiceDraftForm;
   onDiscard: () => Promise<boolean>;
   onIssued: (result: Extract<InvoiceIssueResult, { kind: "issued" }>) => void;
+  previewIsReady: boolean;
   review: InvoiceDraftReview;
   selectedClient: Client | undefined;
   replacementNotice: ReplacementDraftNoticeValues | null;
@@ -45,6 +46,7 @@ export function InvoiceDraftInspector({
   draftForm,
   onDiscard,
   onIssued,
+  previewIsReady,
   review,
   selectedClient,
   replacementNotice,
@@ -150,6 +152,7 @@ export function InvoiceDraftInspector({
           <InvoiceDraftActions
             draftForm={draftForm}
             onDiscard={reviewState.onDiscard}
+            previewIsReady={previewIsReady}
             reviewInProgress={issue.state.kind === "reviewing"}
             selectedClient={selectedClient}
             trigger={issue.trigger}

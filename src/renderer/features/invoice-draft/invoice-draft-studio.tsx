@@ -8,6 +8,8 @@ import {
 } from "../../../domain/invoices/invoice-draft.ts";
 import type { IssuerSettings } from "../../../domain/issuer/issuer-settings.ts";
 import type { BusinessDate } from "../../../domain/time/business-date.ts";
+import { billingDocumentFonts } from "../../../documents/billing-document-fonts.ts";
+import { BillingDocumentFontGate } from "../../ui/billing-document-font-gate.tsx";
 import { DraftRecoveryDialog } from "./draft-recovery-dialog.tsx";
 import { InvoiceDraftInspector } from "./invoice-draft-inspector.tsx";
 import { InvoicePreview } from "./invoice-preview.tsx";
@@ -51,21 +53,29 @@ export function InvoiceDraftStudio({
   }
 
   return (
-    <div className="document-studio">
-      <InvoicePreview issuer={issuer} review={review} />
-      <InvoiceDraftInspector
-        clients={clients}
-        draft={draft}
-        draftForm={draftForm}
-        onDiscard={discardDraft}
-        onIssued={onIssued}
-        review={review}
-        selectedClient={selectedClient}
-        replacementNotice={replacementNotice}
-      />
-      {recoveryRequired ? (
-        <DraftRecoveryDialog onDiscard={() => void discardDraft()} onResume={onRecoveryResolved} />
-      ) : null}
-    </div>
+    <BillingDocumentFontGate fonts={billingDocumentFonts}>
+      {(fontReadiness) => (
+        <div className="document-studio">
+          <InvoicePreview fontReadiness={fontReadiness} issuer={issuer} review={review} />
+          <InvoiceDraftInspector
+            clients={clients}
+            draft={draft}
+            draftForm={draftForm}
+            onDiscard={discardDraft}
+            onIssued={onIssued}
+            previewIsReady={fontReadiness.status === "ready"}
+            review={review}
+            selectedClient={selectedClient}
+            replacementNotice={replacementNotice}
+          />
+          {recoveryRequired ? (
+            <DraftRecoveryDialog
+              onDiscard={() => void discardDraft()}
+              onResume={onRecoveryResolved}
+            />
+          ) : null}
+        </div>
+      )}
+    </BillingDocumentFontGate>
   );
 }

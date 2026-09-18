@@ -8,6 +8,7 @@ import type { ElectronApplication } from "playwright";
 import { initialWorkspaceState } from "../../src/application/workspace.js";
 import { persistedClientSchema } from "../../src/domain/clients/client.js";
 import { persistedIssuedInvoiceSchema } from "../../src/domain/invoices/issued-invoice.js";
+import { billingDocumentFontSubsets } from "../../src/domain/validation/billing-document-text.js";
 import { serializeWorkspaceState } from "../../src/infrastructure/persistence/workspace-state.js";
 import { completeClient } from "../fixtures/client.js";
 import { completeIssuedInvoice } from "../fixtures/issued-invoice.js";
@@ -59,6 +60,8 @@ test("live invoice and credit-note previews fit the available production workspa
     const page = await electronApp.firstWindow();
     const invoicePreview = page.getByLabel("Invoice preview");
     await expect(invoicePreview).toBeVisible();
+    await expectPreviewFontReadiness(invoicePreview);
+    await expectPreviewUsesBundledArimoFonts(invoicePreview);
 
     await setWindowSize({ electronApp, size: minimumWindow });
     const minimumInvoice = await expectFittedA4Page(invoicePreview);
@@ -144,6 +147,7 @@ test("live invoice and credit-note previews fit the available production workspa
     await page.getByLabel("Credit-note issue date").fill(issueDate);
     const creditNotePreview = page.getByLabel("Credit note preview");
     await expect(creditNotePreview).toBeVisible();
+    await expectPreviewFontReadiness(creditNotePreview);
     await expect(creditNotePreview).toHaveAttribute("data-preview-mode", "fit");
 
     await setWindowSize({ electronApp, size: minimumWindow });
@@ -294,6 +298,48 @@ async function expectToolbarFits(preview: Locator): Promise<void> {
     scrollWidth: element.scrollWidth,
   }));
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+}
+
+async function expectPreviewUsesBundledArimoFonts(preview: Locator): Promise<void> {
+  const evidence = await preview.evaluate((element) => {
+    const documentPage = element.querySelector<HTMLElement>(".invoice-document");
+    if (!documentPage) throw new Error("Expected a visible billing document");
+    const arimoFaces = Array.from(document.fonts).filter(
+      ({ family }) => family.replaceAll('"', "") === "Arimo",
+    );
+    return {
+      boldLoaded: document.fonts.check('700 16px "Arimo"', "Invoice"),
+      computedFamily: getComputedStyle(documentPage).fontFamily.replaceAll('"', ""),
+      faceCount: arimoFaces.length,
+      italicLoaded: document.fonts.check('italic 400 16px "Arimo"', "Invoice"),
+      regularLoaded: document.fonts.check('400 16px "Arimo"', "Invoice"),
+      statuses: arimoFaces.map(({ status }) => status),
+    };
+  });
+
+  expect(evidence.faceCount).toBe(billingDocumentFontSubsets.length * 3);
+  expect(evidence.statuses).toEqual(Array.from({ length: evidence.faceCount }, () => "loaded"));
+  expect(evidence.regularLoaded).toBe(true);
+  expect(evidence.italicLoaded).toBe(true);
+  expect(evidence.boldLoaded).toBe(true);
+  expect(evidence.computedFamily).toBe("Arimo");
+}
+
+async function expectPreviewFontReadiness(preview: Locator): Promise<void> {
+  await expect.poll(() => preview.getAttribute("data-font-status")).toMatch(/^(?:failed|ready)$/u);
+  const evidence = await preview.evaluate(() => ({
+    faces: Array.from(document.fonts).map(({ family, status, style, unicodeRange, weight }) => ({
+      family,
+      status,
+      style,
+      unicodeRange,
+      weight,
+    })),
+    status: document.fonts.status,
+  }));
+  expect(await preview.getAttribute("data-font-status"), JSON.stringify(evidence, null, 2)).toBe(
+    "ready",
+  );
 }
 
 async function getZoomPercent(preview: Locator): Promise<number> {

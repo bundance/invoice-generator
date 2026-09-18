@@ -1,8 +1,9 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { LiveA4PreviewFrame } from "./live-a4-preview-frame.tsx";
+import { LiveA4PreviewFrame as PreviewFrame } from "./live-a4-preview-frame.tsx";
 
 const fixedPageWidth = 794;
 const fixedPageHeight = 1123;
@@ -234,6 +235,25 @@ describe("Live A4 preview frame", () => {
     expect(screen.getByLabelText("Current zoom")).toHaveTextContent("53%");
   });
 });
+
+type TestLiveA4PreviewFrameProps = Readonly<{
+  ariaLabel: string;
+  children: ReactNode;
+  documentId: string;
+}>;
+
+const readyFontReadiness = {
+  restart() {},
+  status: "ready",
+} as const;
+
+function LiveA4PreviewFrame({ ariaLabel, children, documentId }: TestLiveA4PreviewFrameProps) {
+  return (
+    <PreviewFrame ariaLabel={ariaLabel} documentId={documentId} fontReadiness={readyFontReadiness}>
+      {children}
+    </PreviewFrame>
+  );
+}
 
 type PreviewSize = Readonly<{ height: number; width: number }>;
 
