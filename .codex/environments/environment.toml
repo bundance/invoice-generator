@@ -6,4 +6,4 @@ name = "invoice-generator"
 script = ""
 
 [setup.darwin]
-script = "CI=true timeout 300 sh scripts/run-with-project-node.sh vp install --frozen-lockfile"
+script = "CI=true rtk timeout 300 vp install --frozen-lockfile"
