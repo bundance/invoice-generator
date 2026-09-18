@@ -62,8 +62,34 @@ test("live invoice and credit-note previews fit the available production workspa
 
     await setWindowSize({ electronApp, size: minimumWindow });
     const minimumInvoice = await expectFittedA4Page(invoicePreview);
+    await expectToolbarFits(invoicePreview);
+    const invoiceFitPercent = await getZoomPercent(invoicePreview);
+    const invoiceZoomIn = invoicePreview.getByRole("button", { name: "Zoom in" });
+    const invoiceZoomOut = invoicePreview.getByRole("button", { name: "Zoom out" });
+    await invoiceZoomIn.focus();
+    await page.keyboard.press("Enter");
+    expect(await getZoomPercent(invoicePreview)).toBe(invoiceFitPercent + 10);
+    await expect(invoicePreview).toHaveAttribute("data-preview-mode", "manual");
+    await invoiceZoomOut.focus();
+    await page.keyboard.press("Space");
+    expect(await getZoomPercent(invoicePreview)).toBe(invoiceFitPercent);
+
+    await zoomToBound({ button: invoiceZoomIn, preview: invoicePreview, targetPercent: 200 });
+    await expect(invoiceZoomIn).toBeDisabled();
+    const manualPageSize = await expectScrollableA4Page(invoicePreview);
 
     await setWindowSize({ electronApp, size: defaultWindow });
+    expect(await getZoomPercent(invoicePreview)).toBe(200);
+    const resizedManualPage = await invoicePreview.locator(".live-a4-preview-page").boundingBox();
+    if (!resizedManualPage) throw new Error("Expected visible manual preview geometry");
+    expect(resizedManualPage.width).toBeCloseTo(manualPageSize.width, 0);
+    expect(resizedManualPage.height).toBeCloseTo(manualPageSize.height, 0);
+
+    await zoomToBound({ button: invoiceZoomOut, preview: invoicePreview, targetPercent: 25 });
+    await expect(invoiceZoomOut).toBeDisabled();
+    await invoicePreview.getByRole("button", { name: "Fit preview" }).click();
+    await expect(invoicePreview).toHaveAttribute("data-preview-mode", "fit");
+
     const defaultInvoice = await expectFittedA4Page(invoicePreview);
     expect(defaultInvoice.height).toBeGreaterThan(minimumInvoice.height);
 
@@ -104,6 +130,9 @@ test("live invoice and credit-note previews fit the available production workspa
       .toBeLessThan(0.5);
     await page.evaluate(() => window.scrollTo(0, 0));
 
+    await invoiceZoomIn.click();
+    await expect(invoicePreview).toHaveAttribute("data-preview-mode", "manual");
+
     await page.getByRole("button", { name: "Invoices" }).click();
     await page
       .getByRole("article", { name: `Invoice ${completeIssuedInvoice.id}` })
@@ -115,6 +144,7 @@ test("live invoice and credit-note previews fit the available production workspa
     await page.getByLabel("Credit-note issue date").fill(issueDate);
     const creditNotePreview = page.getByLabel("Credit note preview");
     await expect(creditNotePreview).toBeVisible();
+    await expect(creditNotePreview).toHaveAttribute("data-preview-mode", "fit");
 
     await setWindowSize({ electronApp, size: minimumWindow });
     const controls = page.locator(".credit-note-controls");
@@ -127,6 +157,15 @@ test("live invoice and credit-note previews fit the available production workspa
     expect(Math.abs(controlsBox.y - previewBox.y)).toBeLessThanOrEqual(1);
     expect(previewBox.x).toBeGreaterThan(controlsBox.x + controlsBox.width);
     await expectFittedA4Page(creditNotePreview);
+    await expectToolbarFits(creditNotePreview);
+
+    const creditFitPercent = await getZoomPercent(creditNotePreview);
+    await creditNotePreview.getByRole("button", { name: "Zoom in" }).click();
+    expect(await getZoomPercent(creditNotePreview)).toBe(creditFitPercent + 10);
+    await setWindowSize({ electronApp, size: defaultWindow });
+    expect(await getZoomPercent(creditNotePreview)).toBe(creditFitPercent + 10);
+    await creditNotePreview.getByRole("button", { name: "Fit preview" }).click();
+    await expectFittedA4Page(creditNotePreview);
   } finally {
     await closeApp(electronApp);
   }
@@ -136,6 +175,11 @@ type WindowSize = Readonly<{ height: number; width: number }>;
 type SetWindowSizeOptions = Readonly<{
   electronApp: ElectronApplication;
   size: WindowSize;
+}>;
+type ZoomToBoundOptions = Readonly<{
+  button: Locator;
+  preview: Locator;
+  targetPercent: number;
 }>;
 
 async function setWindowSize({ electronApp, size }: SetWindowSizeOptions): Promise<void> {
@@ -183,5 +227,86 @@ async function expectFittedA4Page(
   expect(pageLayout.width).toBeCloseTo(pageBox.width, 0);
   expect(pageLayout.height).toBeCloseTo(pageBox.height, 0);
   expect(pageBox.height).toBeLessThanOrEqual(a4HeightPixels + 1);
+  expect(
+    Math.abs(pageBox.x + pageBox.width / 2 - (viewportBox.x + viewportBox.width / 2)),
+  ).toBeLessThan(0.5);
+  expect(
+    Math.abs(pageBox.y + pageBox.height / 2 - (viewportBox.y + viewportBox.height / 2)),
+  ).toBeLessThan(0.5);
+  const overflow = await viewport.evaluate((element) => ({
+    horizontal: element.scrollWidth - element.clientWidth,
+    vertical: element.scrollHeight - element.clientHeight,
+  }));
+  expect(overflow.horizontal).toBeLessThanOrEqual(1);
+  expect(overflow.vertical).toBeLessThanOrEqual(1);
   return { height: pageBox.height, width: pageBox.width };
+}
+
+async function expectScrollableA4Page(
+  preview: Locator,
+): Promise<Readonly<{ height: number; width: number }>> {
+  const viewport = preview.locator(".live-a4-preview-viewport");
+  const page = preview.locator(".live-a4-preview-page");
+  const pageBox = await page.boundingBox();
+  if (!pageBox) throw new Error("Expected visible manual preview geometry");
+  const reachability = await viewport.evaluate((element) => {
+    const previewPage = element.querySelector<HTMLElement>(".live-a4-preview-page");
+    if (!previewPage) throw new Error("Expected the manual preview page");
+    const overflow = {
+      clientHeight: element.clientHeight,
+      clientWidth: element.clientWidth,
+      scrollHeight: element.scrollHeight,
+      scrollWidth: element.scrollWidth,
+    };
+    element.scrollLeft = element.scrollWidth - element.clientWidth;
+    element.scrollTop = element.scrollHeight - element.clientHeight;
+    const pageRect = previewPage.getBoundingClientRect();
+    const viewportRect = element.getBoundingClientRect();
+    return {
+      maximumScroll: { left: element.scrollLeft, top: element.scrollTop },
+      overflow,
+      pageEnd: { bottom: pageRect.bottom, right: pageRect.right },
+      viewportEnd: {
+        bottom: viewportRect.top + element.clientTop + element.clientHeight,
+        right: viewportRect.left + element.clientLeft + element.clientWidth,
+      },
+    };
+  });
+  expect(reachability.overflow.scrollWidth).toBeGreaterThan(reachability.overflow.clientWidth);
+  expect(reachability.overflow.scrollHeight).toBeGreaterThan(reachability.overflow.clientHeight);
+  expect(reachability.maximumScroll.left).toBeGreaterThan(0);
+  expect(reachability.maximumScroll.top).toBeGreaterThan(0);
+  expect(reachability.pageEnd.right, JSON.stringify(reachability)).toBeCloseTo(
+    reachability.viewportEnd.right,
+    0,
+  );
+  expect(reachability.pageEnd.bottom, JSON.stringify(reachability)).toBeCloseTo(
+    reachability.viewportEnd.bottom,
+    0,
+  );
+  return { height: pageBox.height, width: pageBox.width };
+}
+
+async function expectToolbarFits(preview: Locator): Promise<void> {
+  const toolbar = preview.locator(".preview-toolbar");
+  const layout = await toolbar.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+}
+
+async function getZoomPercent(preview: Locator): Promise<number> {
+  const text = await preview.getByLabel("Current zoom").textContent();
+  const percent = Number.parseInt(text ?? "", 10);
+  if (!Number.isFinite(percent)) throw new Error(`Expected a numeric zoom percentage, got ${text}`);
+  return percent;
+}
+
+async function zoomToBound({ button, preview, targetPercent }: ZoomToBoundOptions): Promise<void> {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    if ((await getZoomPercent(preview)) === targetPercent) return;
+    await button.click();
+  }
+  throw new Error(`Could not reach ${targetPercent}% manual zoom`);
 }
