@@ -78,32 +78,35 @@ export function BillingDocument({ embedFonts = true, model }: BillingDocumentPro
           </tr>
         </thead>
         <tbody>
-          <tr className="service-row">
-            <td>
-              <div className="service-copy" data-fit-region="service-description">
-                {model.serviceDescription}
-                <br />
-                <br />
-                <em>Invoice Period:</em>
-                <br />
-                <br />
-                {model.periodStart} -<br />
-                {model.periodEnd}
-              </div>
-            </td>
-            <td className="document-value" data-fit-region="billable-days">
-              {model.billableDays}
-            </td>
-            <td className="document-value" data-fit-region="day-rate">
-              {model.dayRate}
-            </td>
-            <td className="document-value" data-fit-region="line-net">
-              {model.net}
-            </td>
-            <td className="document-value" data-fit-region="line-vat">
-              {model.vat}
-            </td>
-          </tr>
+          {model.serviceLines.map((serviceLine, index) => (
+            <tr className="service-row" key={serviceLine.renderKey}>
+              <td>
+                <div
+                  className="service-copy"
+                  data-fit-region={
+                    index === 0 ? "service-description" : `service-description-${index}`
+                  }
+                >
+                  {serviceLine.serviceDescription}
+                  <br />
+                  <em>Invoice period:</em> {serviceLine.periodStart} - {serviceLine.periodEnd}
+                </div>
+              </td>
+              <td className="document-value" data-fit-region={`billable-days-${index}`}>
+                {serviceLine.billableDays}
+              </td>
+              <td className="document-value" data-fit-region={`day-rate-${index}`}>
+                {serviceLine.dayRate}
+              </td>
+              <td className="document-value" data-fit-region={`line-net-${index}`}>
+                {serviceLine.net}
+              </td>
+              <td className="document-value" data-fit-region={`line-vat-${index}`}>
+                {serviceLine.vat}
+                {serviceLine.vatRate ? <small>{serviceLine.vatRate}%</small> : null}
+              </td>
+            </tr>
+          ))}
           <tr>
             <td aria-label="Not applicable" />
             <td aria-label="Not applicable" />
@@ -135,6 +138,14 @@ export function BillingDocument({ embedFonts = true, model }: BillingDocumentPro
         <section className="document-sterling-vat" data-fit-region="sterling-vat">
           <h3>VAT amounts in sterling</h3>
           <dl>
+            {model.sterlingVatSummary.totalsByRate.map((bucket) => (
+              <div key={bucket.vatRate}>
+                <dt>{bucket.vatRate}% VAT</dt>
+                <dd>
+                  {bucket.net} + {bucket.vat}
+                </dd>
+              </div>
+            ))}
             <div>
               <dt>Net</dt>
               <dd>{model.sterlingVatSummary.net}</dd>
@@ -161,9 +172,9 @@ export function BillingDocument({ embedFonts = true, model }: BillingDocumentPro
         {model.notes.map((note) => (
           <p key={note}>{note}</p>
         ))}
-        {model.taxPoint && model.vatRate ? (
+        {model.taxPoint ? (
           <p>
-            Tax point: {model.taxPoint} · VAT rate: {model.vatRate}% · {model.vatWording}
+            Tax point: {model.taxPoint} · {model.vatWording}
           </p>
         ) : (
           <p>{model.vatWording}</p>

@@ -9,6 +9,7 @@ import { persistedInvoiceDraftSchema } from "../../domain/invoices/invoice-draft
 import { createExchangeDraft } from "../../domain/invoices/exchange-draft.js";
 import { persistedIssuedInvoicesSchema } from "../../domain/invoices/issued-invoice.js";
 import { replacementDraftSourceSchema } from "../../domain/invoices/replacement.js";
+import { replacementDraftHasValidSource } from "../../domain/invoices/replacement.js";
 import { persistedIssuerSettingsSchema } from "../../domain/issuer/issuer-settings.js";
 import type { WorkspaceState } from "../../application/workspace.js";
 import { WorkspaceRecoveryError } from "../../application/workspace-recovery.js";
@@ -18,7 +19,9 @@ import {
   releasedWorkspaceStateV3Schema,
   releasedWorkspaceStateV4Schema,
   releasedWorkspaceStateV5Schema,
+  releasedWorkspaceStateV6Schema,
 } from "./released-workspace-state-schemas.js";
+import { upgradeSchemaSixWorkspaceState } from "./workspace-state-migration.js";
 
 const emptyListSchema = z.tuple([]).readonly();
 const workspaceStateFields = {
@@ -28,7 +31,7 @@ const workspaceStateFields = {
 const workspaceStateRecordSchema = z
   .strictObject({
     ...workspaceStateFields,
-    schemaVersion: z.literal(6),
+    schemaVersion: z.literal(7),
     clients: persistedClientsSchema,
     creditNotes: persistedCreditNotesSchema,
     draft: z
@@ -60,7 +63,7 @@ export function parseWorkspaceState(stateJson: string): WorkspaceState {
 
   const schemaVersionResult = schemaVersionSchema.safeParse(parsedState);
   if (!schemaVersionResult.success) throw new WorkspaceRecoveryError("invalid-schema");
-  if (schemaVersionResult.data.schemaVersion > 6) {
+  if (schemaVersionResult.data.schemaVersion > 7) {
     throw new WorkspaceRecoveryError("newer-version");
   }
 
@@ -86,6 +89,10 @@ export function parseWorkspaceState(stateJson: string): WorkspaceState {
         parseReleasedWorkspaceState(releasedWorkspaceStateV5Schema, parsedState),
       );
     case 6:
+      return parseMigratedWorkspaceState(
+        parseReleasedWorkspaceState(releasedWorkspaceStateV6Schema, parsedState),
+      );
+    case 7:
       return parseCurrentWorkspaceState(parseCurrentWorkspaceRecord(parsedState));
     default:
       throw new WorkspaceRecoveryError("invalid-schema");
@@ -247,8 +254,12 @@ function parseCurrentWorkspaceRecord(
   return result.data;
 }
 
-function parseMigratedWorkspaceState(state: JsonObject): WorkspaceState {
-  const currentState = workspaceStateRecordSchema.safeParse(state);
+function parseMigratedWorkspaceState(state: JsonValue): WorkspaceState {
+  const releasedState = releasedWorkspaceStateV6Schema.safeParse(state);
+  if (!releasedState.success) throw new WorkspaceRecoveryError("inconsistent");
+  const currentState = workspaceStateRecordSchema.safeParse(
+    upgradeSchemaSixWorkspaceState(releasedState.data),
+  );
   if (!currentState.success) throw new WorkspaceRecoveryError("inconsistent");
   return parseCurrentWorkspaceState(currentState.data);
 }
@@ -292,17 +303,7 @@ function checkDraftClient(workspace: WorkspaceState, context: z.core.$Refinement
 }
 
 function checkReplacementDraft(workspace: WorkspaceState, context: z.core.$RefinementCtx): void {
-  if (workspace.draft?.kind !== "replacement") return;
-  const { source } = workspace.draft;
-  const original = workspace.issuedInvoices.find(({ id }) => id === source);
-  const creditNote = workspace.creditNotes.find(
-    ({ originalInvoiceId }) => originalInvoiceId === source,
-  );
-  if (
-    !original ||
-    creditNote?.originalInvoiceId !== original.id ||
-    workspace.issuedInvoices.some(({ replacesInvoiceId }) => replacesInvoiceId === original.id)
-  ) {
+  if (!replacementDraftHasValidSource(workspace)) {
     context.addIssue({
       code: "custom",
       message: "A replacement draft must link one fully credited invoice.",

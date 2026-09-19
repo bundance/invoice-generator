@@ -26,12 +26,16 @@ export const completeInvoiceDraftInput = {
   clientLegalName: completeClient.legalName,
   clientPostalAddress: completeClient.postalAddress,
   currencyCode: completeClient.currency.code,
-  serviceDescription: completeClient.defaultServiceDescription,
-  periodStart: "2026-09-01",
-  periodEnd: "2026-09-04",
   issueDate: "2026-09-04",
-  billableDays: "4",
-  dayRate: completeClient.standardDayRate,
+  serviceLines: [
+    {
+      billableDays: "4",
+      dayRate: completeClient.standardDayRate,
+      periodEnd: "2026-09-04",
+      periodStart: "2026-09-01",
+      serviceDescription: completeClient.defaultServiceDescription,
+    },
+  ],
   paymentTerms: completeClient.paymentTerms,
   notes: "",
   purchaseOrder: "",
@@ -68,10 +72,15 @@ if (gbpVatDraft.vatTreatment !== "uk-taxable") {
 
 export const completeGbpVatInvoiceDraftInput = {
   ...gbpVatDraft,
-  billableDays: "4",
   issueDate: "2026-09-06",
-  periodEnd: "2026-09-05",
-  periodStart: "2026-09-02",
+  serviceLines: [
+    {
+      ...gbpVatDraft.serviceLines[0],
+      billableDays: "4",
+      periodEnd: "2026-09-05",
+      periodStart: "2026-09-02",
+    },
+  ],
   taxPoint: "2026-09-05",
 } as const;
 
@@ -103,7 +112,6 @@ if (foreignCurrencyVatDraft.vatTreatment !== "uk-taxable") {
 
 export const completeForeignCurrencyVatInvoiceDraftInput = {
   ...foreignCurrencyVatDraft,
-  billableDays: "4",
   exchange: {
     effectiveDate: "2026-09-05",
     evidenceReference: "HMRC monthly exchange rates, September 2026",
@@ -112,8 +120,14 @@ export const completeForeignCurrencyVatInvoiceDraftInput = {
     rate: "1.25",
   },
   issueDate: "2026-09-06",
-  periodEnd: "2026-09-05",
-  periodStart: "2026-09-02",
+  serviceLines: [
+    {
+      ...foreignCurrencyVatDraft.serviceLines[0],
+      billableDays: "4",
+      periodEnd: "2026-09-05",
+      periodStart: "2026-09-02",
+    },
+  ],
   taxPoint: "2026-09-05",
 } as const;
 

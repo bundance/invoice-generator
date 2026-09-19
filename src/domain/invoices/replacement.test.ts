@@ -28,21 +28,25 @@ describe("replacement invoice", () => {
 
     expect(replacement).toEqual({
       draft: {
-        billableDays: "4",
         clientId: currentClient.id,
         clientLegalName: "Genesis Global",
         clientPostalAddress: "123 Market Street\nNew York\nNY 10001",
         currencyCode: "USD",
-        dayRate: "725",
         issueDate: "",
         notes: "",
         outsideScopeEvidenceReference: "Contract and tax certificate",
         paymentTerms: "Due within 30 days",
-        periodEnd: "2026-09-04",
-        periodStart: "2026-09-01",
         purchaseOrder: "",
         reverseCharge: true,
-        serviceDescription: "React Native consultancy\nProject delivery",
+        serviceLines: [
+          {
+            billableDays: "4",
+            dayRate: "725",
+            periodEnd: "2026-09-04",
+            periodStart: "2026-09-01",
+            serviceDescription: "React Native consultancy\nProject delivery",
+          },
+        ],
         vatTreatment: "outside-scope",
       },
       source: "GGIOHK-0043",

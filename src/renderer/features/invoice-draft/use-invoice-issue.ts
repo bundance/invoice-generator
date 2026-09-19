@@ -1,7 +1,10 @@
 import { useReducer, useRef } from "react";
 
 import type { InvoiceIssueResult } from "../../../application/invoice-application-contract.ts";
-import type { InvoiceDraftInput } from "../../../domain/invoices/invoice-draft.ts";
+import {
+  parseInvoiceDraftInput,
+  type InvoiceDraftInput,
+} from "../../../domain/invoices/invoice-draft.ts";
 import { initialInvoiceIssueState, transitionInvoiceIssue } from "./invoice-issue-machine.ts";
 
 type UseInvoiceIssueOptions = Readonly<{
@@ -17,7 +20,7 @@ export function useInvoiceIssue({ draft, onIssued, saveBeforeReview }: UseInvoic
 
   async function review(): Promise<void> {
     const requestId = ++nextReviewRequestId.current;
-    const reviewedDraft = { ...draft };
+    const reviewedDraft = parseInvoiceDraftInput(draft);
     dispatch({ draft: reviewedDraft, requestId, type: "review-started" });
     try {
       if (!(await saveBeforeReview(reviewedDraft))) {

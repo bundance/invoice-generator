@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Client, ClientId } from "../clients/client.ts";
 import { formatDocumentId } from "../clients/client.ts";
 import { findCurrency, persistedCurrencySchema, type Currency } from "../money/currency.ts";
-import { formatCurrencyAmount, normalizePositiveDecimal } from "../money/decimal.ts";
+import { formatCurrencyAmount } from "../money/decimal.ts";
 import type { IssuerSettings } from "../issuer/issuer-settings.ts";
 import type { BusinessDate } from "../time/business-date.ts";
 import {
@@ -13,7 +13,6 @@ import {
   normalizeRequiredSingleLine,
   type NormalizedField,
 } from "../validation/text-field.ts";
-import { normalizeVatRate } from "../tax/vat-rate.ts";
 import { outsideScopeVatWording, ukTaxableWording } from "../tax/vat-wording.ts";
 import { invoiceDraftCommonFieldsSchema } from "./invoice-draft-common-fields.ts";
 import {
@@ -27,30 +26,41 @@ import {
 } from "./exchange-draft.ts";
 import type { SterlingVatSummary } from "./exchange-record.ts";
 import {
-  amountFitsCurrencyPrecision,
-  billableDaysExceedInvoicePeriod,
-  calculateInvoiceTotals,
-  inclusiveInvoicePeriodDays,
-  isPositiveQuarterDayAmount,
-  issueDateRequiresAcknowledgement,
-  type InvoiceTotals,
-  type InvoiceTotalTreatment,
-} from "./invoice-policy.ts";
+  outsideScopeInvoiceServiceLineInputSchema,
+  normalizeInvoiceDate,
+  reviewInvoiceServiceLines,
+  taxableInvoiceServiceLineInputSchema,
+  type InvoiceServiceLineFieldName,
+  type InvoiceServiceLinePreview,
+  type NonEmptyReadonlyArray,
+  type OutsideScopeInvoiceServiceLineInput,
+  type ReviewedInvoiceServiceLine,
+  type ReviewedTaxableInvoiceServiceLine,
+  type TaxableInvoiceServiceLineInput,
+} from "./invoice-service-line.ts";
+import { issueDateRequiresAcknowledgement, type InvoiceTotals } from "./invoice-policy.ts";
 import {
   persistedInvoiceVatTreatmentSchema,
   type InvoiceVatTreatment,
 } from "./invoice-vat-treatment.ts";
 import { persistedInvoiceTaxFactsSchema, type InvoiceTaxFacts } from "./invoice-tax-facts.ts";
 
+const taxableServiceLinesSchema = z
+  .tuple([taxableInvoiceServiceLineInputSchema], taxableInvoiceServiceLineInputSchema)
+  .readonly();
+const outsideScopeServiceLinesSchema = z
+  .tuple([outsideScopeInvoiceServiceLineInputSchema], outsideScopeInvoiceServiceLineInputSchema)
+  .readonly();
 const invoiceDraftFieldsSchema = z
   .discriminatedUnion("vatTreatment", [
     invoiceDraftCommonFieldsSchema.extend({
       exchange: exchangeDraftSchema,
+      serviceLines: taxableServiceLinesSchema,
       vatTreatment: z.literal("uk-taxable"),
-      vatRate: z.string(),
       taxPoint: z.string(),
     }),
     invoiceDraftCommonFieldsSchema.extend({
+      serviceLines: outsideScopeServiceLinesSchema,
       vatTreatment: z.literal("outside-scope"),
       outsideScopeEvidenceReference: z.string(),
       reverseCharge: z.boolean(),
@@ -78,10 +88,17 @@ export type InvoiceDraftInput = Readonly<z.input<typeof invoiceDraftFieldsSchema
 export type InvoiceDraft = Readonly<z.output<typeof persistedInvoiceDraftSchema>>;
 type KeysOfUnion<Value> = Value extends Value ? keyof Value : never;
 export type InvoiceDraftFieldName =
-  | Exclude<KeysOfUnion<InvoiceDraftInput>, "exchange">
+  | Exclude<KeysOfUnion<InvoiceDraftInput>, "exchange" | "serviceLines">
   | ExchangeDraftFieldName;
+export type InvoiceDraftErrorLocation =
+  | Readonly<{ kind: "invoice"; fieldName: InvoiceDraftFieldName }>
+  | Readonly<{
+      kind: "service-line";
+      serviceLineIndex: number;
+      fieldName: InvoiceServiceLineFieldName;
+    }>;
 export type InvoiceDraftError = Readonly<{
-  fieldName: InvoiceDraftFieldName;
+  location: InvoiceDraftErrorLocation;
   message: string;
 }>;
 export type InvoiceDraftWarning = Readonly<{
@@ -100,17 +117,21 @@ export const emptyInvoiceDraftInput: InvoiceDraftInput = {
   clientLegalName: "",
   clientPostalAddress: "",
   currencyCode: "GBP",
-  serviceDescription: "",
-  periodStart: "",
-  periodEnd: "",
   issueDate: "",
-  billableDays: "",
-  dayRate: "",
   paymentTerms: "",
   notes: "",
   purchaseOrder: "",
+  serviceLines: [
+    {
+      billableDays: "",
+      dayRate: "",
+      periodEnd: "",
+      periodStart: "",
+      serviceDescription: "",
+      vatRate: "",
+    },
+  ],
   vatTreatment: "uk-taxable",
-  vatRate: "",
   taxPoint: "",
   exchange: { kind: "not-required" },
 };
@@ -119,38 +140,29 @@ export type { InvoiceTotals } from "./invoice-policy.ts";
 type InvoiceCandidateFacts = Readonly<{
   client: Readonly<{ id: ClientId; legalName: string; postalAddress: string }>;
   currency: Client["currency"];
-  serviceDescription: string;
-  periodStart: string;
-  periodEnd: string;
   issueDate: string;
-  billableDays: string;
-  dayRate: string;
   paymentTerms: string;
   notes: string;
   purchaseOrder: string;
   proposedInvoiceId: string;
   issuer: IssuerSettings;
+  serviceLines: NonEmptyReadonlyArray<ReviewedInvoiceServiceLine>;
   totals: InvoiceTotals;
 }>;
 
 export type InvoiceCandidate = InvoiceCandidateFacts & Readonly<{ taxFacts: InvoiceTaxFacts }>;
 
 export type InvoiceDraftPreview = Readonly<{
-  billableDays: string | null;
   clientLegalName: string | null;
   clientPostalAddress: string | null;
   currencyCode: string | null;
-  formattedDayRate: string | null;
   issueDate: string | null;
   notes: string | null;
   paymentTerms: string | null;
-  periodEnd: string | null;
-  periodStart: string | null;
   proposedInvoiceId: string | null;
   purchaseOrder: string | null;
-  serviceDescription: string | null;
+  serviceLines: NonEmptyReadonlyArray<InvoiceServiceLinePreview>;
   taxPoint: string | null;
-  vatRate: string | null;
   vatWording: string;
 }>;
 
@@ -171,36 +183,50 @@ type ReviewInvoiceDraftOptions = Readonly<{
   today: BusinessDate;
 }>;
 
+function createInvoiceServiceLineInput(
+  client: Client,
+): TaxableInvoiceServiceLineInput | OutsideScopeInvoiceServiceLineInput {
+  const commonLine = {
+    billableDays: "",
+    dayRate: client.standardDayRate,
+    periodEnd: "",
+    periodStart: "",
+    serviceDescription: client.defaultServiceDescription,
+  };
+  return client.vatTreatment.kind === "uk-taxable"
+    ? { ...commonLine, vatRate: client.vatTreatment.rate }
+    : commonLine;
+}
+
 export function createInvoiceDraft(client: Client): InvoiceDraftInput {
   const commonDraftFields = {
     clientId: client.id,
     clientLegalName: client.legalName,
     clientPostalAddress: client.postalAddress,
     currencyCode: client.currency.code,
-    serviceDescription: client.defaultServiceDescription,
-    periodStart: "",
-    periodEnd: "",
     issueDate: "",
-    billableDays: "",
-    dayRate: client.standardDayRate,
     paymentTerms: client.paymentTerms,
     notes: "",
     purchaseOrder: "",
   };
-  return client.vatTreatment.kind === "uk-taxable"
-    ? {
-        ...commonDraftFields,
-        vatTreatment: "uk-taxable",
-        vatRate: client.vatTreatment.rate,
-        taxPoint: "",
-        exchange: createExchangeDraft(client.currency.code),
-      }
-    : {
-        ...commonDraftFields,
-        vatTreatment: "outside-scope",
-        outsideScopeEvidenceReference: client.vatTreatment.evidenceReference,
-        reverseCharge: client.vatTreatment.reverseCharge,
-      };
+  if (client.vatTreatment.kind === "uk-taxable") {
+    return {
+      ...commonDraftFields,
+      serviceLines: [
+        { ...createInvoiceServiceLineInput(client), vatRate: client.vatTreatment.rate },
+      ],
+      vatTreatment: "uk-taxable",
+      taxPoint: "",
+      exchange: createExchangeDraft(client.currency.code),
+    };
+  }
+  return {
+    ...commonDraftFields,
+    serviceLines: [createInvoiceServiceLineInput(client)],
+    vatTreatment: "outside-scope",
+    outsideScopeEvidenceReference: client.vatTreatment.evidenceReference,
+    reverseCharge: client.vatTreatment.reverseCharge,
+  };
 }
 
 export function changeInvoiceDraftCurrency(
@@ -208,11 +234,7 @@ export function changeInvoiceDraftCurrency(
   currencyCode: string,
 ): InvoiceDraftInput {
   if (draft.vatTreatment === "outside-scope") return { ...draft, currencyCode };
-  return {
-    ...draft,
-    currencyCode,
-    exchange: createExchangeDraft(currencyCode),
-  };
+  return { ...draft, currencyCode, exchange: createExchangeDraft(currencyCode) };
 }
 
 type UntrustedInvoiceDraftInput = Parameters<typeof invoiceDraftFieldsSchema.parse>[0];
@@ -234,13 +256,13 @@ export function invoiceDraftInputsAreEqual(
   if (
     first === null ||
     first.vatTreatment !== second.vatTreatment ||
-    !commonInvoiceDraftFieldNames.every((fieldName) => first[fieldName] === second[fieldName])
+    !commonInvoiceDraftFieldNames.every((fieldName) => first[fieldName] === second[fieldName]) ||
+    !serviceLineInputsAreEqual(first.serviceLines, second.serviceLines)
   ) {
     return false;
   }
   if (first.vatTreatment === "uk-taxable" && second.vatTreatment === "uk-taxable") {
     return (
-      first.vatRate === second.vatRate &&
       first.taxPoint === second.taxPoint &&
       exchangeDraftInputsAreEqual(first.exchange, second.exchange)
     );
@@ -259,90 +281,122 @@ export function reviewInvoiceDraft({
   issuer,
   today,
 }: ReviewInvoiceDraftOptions): InvoiceDraftReview {
-  const fields = normalizeDraftFields(draft);
+  const fields = normalizeInvoiceFields(draft);
   const currency = findCurrency(draft.currencyCode);
-  const calculatedTotals = calculateTotals(
+  const serviceLineReview =
+    draft.vatTreatment === "uk-taxable"
+      ? reviewInvoiceServiceLines({
+          currency,
+          kind: "uk-taxable",
+          serviceLines: draft.serviceLines,
+        })
+      : reviewInvoiceServiceLines({
+          currency,
+          kind: "outside-scope",
+          serviceLines: draft.serviceLines,
+        });
+  const exchangeReview = reviewDraftExchange(
+    draft,
+    fields,
     currency,
-    fields.billableDays,
-    fields.dayRate,
-    fields.tax,
+    serviceLineReview.serviceLines,
   );
-  const exchangeReview = reviewDraftExchange(draft, fields, currency, calculatedTotals);
-  const errors = collectDraftErrors(client, draft, fields, currency, today, exchangeReview.errors);
-  const totals = totalsHaveBlockingErrors(errors) ? null : calculatedTotals;
-  const formattedTotals = formatTotals(currency, totals);
+  const errors = collectDraftErrors(
+    client,
+    draft,
+    fields,
+    currency,
+    today,
+    serviceLineReview,
+    exchangeReview.errors,
+  );
   const candidate =
-    errors.length === 0 && client && currency && totals && exchangeReview.kind !== "invalid"
-      ? createCandidate(client, fields, currency, issuer, totals, exchangeReview)
+    errors.length === 0 &&
+    client &&
+    currency &&
+    serviceLineReview.serviceLines &&
+    serviceLineReview.totals &&
+    exchangeReview.kind !== "invalid"
+      ? createCandidate(
+          client,
+          fields,
+          currency,
+          issuer,
+          serviceLineReview.serviceLines,
+          serviceLineReview.totals,
+          exchangeReview,
+        )
       : null;
 
   return {
     candidate,
     errors,
-    formattedTotals,
-    preview: createPreview(errors.length === 0 ? client : undefined, draft, fields, currency),
-    totals,
+    formattedTotals: formatTotals(currency, serviceLineReview.totals),
+    preview: createPreview(
+      errors.length === 0 ? client : undefined,
+      draft,
+      fields,
+      currency,
+      serviceLineReview.previews,
+    ),
+    totals: serviceLineReview.totals,
     sterlingVatSummary: exchangeReview.sterlingVatSummary,
-    warnings: lateIssueWarnings(fields.periodEnd, fields.issueDate),
+    warnings: lateIssueWarnings(serviceLineReview.latestPeriodEnd, fields.issueDate),
   };
 }
 
 function reviewDraftExchange(
   draft: InvoiceDraftInput,
-  fields: NormalizedDraftFields,
+  fields: NormalizedInvoiceFields,
   currency: Currency | undefined,
-  totals: InvoiceTotals | null,
+  serviceLines: NonEmptyReadonlyArray<ReviewedInvoiceServiceLine> | null,
 ): ExchangeReview {
   if (draft.vatTreatment === "outside-scope" || fields.tax.kind === "outside-scope") {
-    return {
-      errors: [],
-      kind: "not-required",
-      sterlingVatSummary: null,
-    };
+    return { errors: [], kind: "not-required", sterlingVatSummary: null };
   }
   return reviewExchange({
-    currencyCode: currency?.code,
+    currency,
     exchange: draft.exchange,
+    serviceLines: taxableServiceLines(serviceLines),
     taxPoint: fields.tax.taxPoint,
-    totals,
-    vatRate: fields.tax.rate,
   });
 }
 
-function totalsHaveBlockingErrors(errors: readonly InvoiceDraftError[]): boolean {
-  const totalFields: readonly InvoiceDraftFieldName[] = [
-    "billableDays",
-    "currencyCode",
-    "dayRate",
-    "vatRate",
-  ];
-  return errors.some(({ fieldName }) => totalFields.includes(fieldName));
+function taxableServiceLines(
+  serviceLines: NonEmptyReadonlyArray<ReviewedInvoiceServiceLine> | null,
+): NonEmptyReadonlyArray<ReviewedTaxableInvoiceServiceLine> | null {
+  if (!serviceLines || !serviceLines.every(isTaxableServiceLine)) return null;
+  const [first, ...rest] = serviceLines;
+  if (!isTaxableServiceLine(first)) return null;
+  return [first, ...rest.filter(isTaxableServiceLine)];
+}
+
+function isTaxableServiceLine(
+  serviceLine: ReviewedInvoiceServiceLine,
+): serviceLine is ReviewedTaxableInvoiceServiceLine {
+  return "vatRate" in serviceLine;
 }
 
 function createPreview(
   client: Client | undefined,
   draft: InvoiceDraftInput,
-  fields: NormalizedDraftFields,
+  fields: NormalizedInvoiceFields,
   currency: Currency | undefined,
+  serviceLines: NonEmptyReadonlyArray<InvoiceServiceLinePreview>,
 ): InvoiceDraftPreview {
   return {
-    billableDays: normalizedFieldValue(fields.billableDays),
     clientLegalName: normalizedFieldValue(fields.clientLegalName),
     clientPostalAddress: normalizedFieldValue(fields.clientPostalAddress),
     currencyCode: currency?.code ?? null,
-    formattedDayRate: formatDayRate(currency, fields.dayRate),
     issueDate: normalizedFieldValue(fields.issueDate),
     notes: normalizedFieldValue(fields.notes),
     paymentTerms: normalizedFieldValue(fields.paymentTerms),
-    periodEnd: normalizedFieldValue(fields.periodEnd),
-    periodStart: normalizedFieldValue(fields.periodStart),
     proposedInvoiceId: client
       ? formatDocumentId(client.invoiceSequence.prefix, client.invoiceSequence.nextNumber)
       : null,
     purchaseOrder: normalizedFieldValue(fields.purchaseOrder),
-    serviceDescription: normalizedFieldValue(fields.serviceDescription),
+    serviceLines,
     taxPoint: fields.tax.kind === "uk-taxable" ? normalizedFieldValue(fields.tax.taxPoint) : null,
-    vatRate: fields.tax.kind === "uk-taxable" ? normalizedFieldValue(fields.tax.rate) : null,
     vatWording:
       draft.vatTreatment === "uk-taxable"
         ? ukTaxableWording
@@ -350,51 +404,24 @@ function createPreview(
   };
 }
 
-function formatDayRate(currency: Currency | undefined, dayRate: NormalizedField): string | null {
-  if (
-    !currency ||
-    dayRate.kind === "invalid" ||
-    !amountFitsCurrencyPrecision(dayRate.value, currency.minorUnit)
-  ) {
-    return null;
-  }
-  return formatCurrencyAmount(dayRate.value, currency.code, currency.minorUnit);
-}
-
-function normalizedFieldValue(field: NormalizedField): string | null {
-  return field.kind === "valid" ? field.value : null;
-}
-
-type NormalizedDraftFields = Readonly<{
-  billableDays: NormalizedField;
+type NormalizedInvoiceFields = Readonly<{
   clientLegalName: NormalizedField;
   clientPostalAddress: NormalizedField;
-  dayRate: NormalizedField;
   issueDate: NormalizedField;
   notes: NormalizedField;
   paymentTerms: NormalizedField;
-  periodEnd: NormalizedField;
-  periodStart: NormalizedField;
   purchaseOrder: NormalizedField;
-  serviceDescription: NormalizedField;
-  tax: NormalizedTaxFields;
+  tax:
+    | Readonly<{ kind: "uk-taxable"; taxPoint: NormalizedField }>
+    | Readonly<{
+        evidenceReference: NormalizedField;
+        kind: "outside-scope";
+        reverseCharge: boolean;
+      }>;
 }>;
 
-type NormalizedTaxFields =
-  | Readonly<{
-      kind: "uk-taxable";
-      rate: NormalizedField;
-      taxPoint: NormalizedField;
-    }>
-  | Readonly<{
-      evidenceReference: NormalizedField;
-      kind: "outside-scope";
-      reverseCharge: boolean;
-    }>;
-
-function normalizeDraftFields(draft: InvoiceDraftInput): NormalizedDraftFields {
+function normalizeInvoiceFields(draft: InvoiceDraftInput): NormalizedInvoiceFields {
   return {
-    billableDays: normalizeBillableDays(draft.billableDays),
     clientLegalName: normalizeRequiredSingleLine(
       draft.clientLegalName,
       "Enter the client's legal name.",
@@ -403,23 +430,15 @@ function normalizeDraftFields(draft: InvoiceDraftInput): NormalizedDraftFields {
       draft.clientPostalAddress,
       "Enter the client's postal address.",
     ),
-    dayRate: normalizePositiveDecimal(draft.dayRate),
-    issueDate: normalizeCalendarDate(draft.issueDate, "Enter the issue date."),
+    issueDate: normalizeInvoiceDate(draft.issueDate, "Enter the issue date."),
     notes: normalizeOptionalMultiline(draft.notes),
     paymentTerms: normalizeRequiredSingleLine(draft.paymentTerms, "Enter payment terms."),
-    periodEnd: normalizeCalendarDate(draft.periodEnd, "Enter the period end."),
-    periodStart: normalizeCalendarDate(draft.periodStart, "Enter the period start."),
     purchaseOrder: normalizeOptionalSingleLine(draft.purchaseOrder),
-    serviceDescription: normalizeRequiredMultiline(
-      draft.serviceDescription,
-      "Enter the service description.",
-    ),
     tax:
       draft.vatTreatment === "uk-taxable"
         ? {
             kind: "uk-taxable",
-            rate: normalizeVatRate(draft.vatRate),
-            taxPoint: normalizeCalendarDate(draft.taxPoint, "Enter the tax point."),
+            taxPoint: normalizeInvoiceDate(draft.taxPoint, "Enter the tax point."),
           }
         : {
             evidenceReference: normalizeRequiredMultiline(
@@ -435,46 +454,40 @@ function normalizeDraftFields(draft: InvoiceDraftInput): NormalizedDraftFields {
 function collectDraftErrors(
   client: Client | undefined,
   draft: InvoiceDraftInput,
-  fields: NormalizedDraftFields,
+  fields: NormalizedInvoiceFields,
   currency: Currency | undefined,
   today: string,
-  exchangeErrors: readonly InvoiceDraftError[],
+  serviceLineReview: ReturnType<typeof reviewInvoiceServiceLines>,
+  exchangeErrors: ExchangeReview["errors"],
 ): InvoiceDraftError[] {
   return [
-    ...normalizedFieldErrors(fields),
+    ...normalizedInvoiceFieldErrors(fields),
+    ...serviceLineReview.errors.map(({ fieldName, message, serviceLineIndex }) => ({
+      location: { fieldName, kind: "service-line" as const, serviceLineIndex },
+      message,
+    })),
     ...clientSelectionErrors(client, draft.clientId),
     ...currencySelectionErrors(currency),
-    ...dateOrderErrors(fields.periodStart, fields.periodEnd, fields.issueDate, today),
-    ...dayRatePrecisionErrors(currency, fields.dayRate),
-    ...billablePeriodErrors(fields.periodStart, fields.periodEnd, fields.billableDays),
-    ...taxTreatmentErrors(draft, fields),
-    ...exchangeErrors,
+    ...dateOrderErrors(serviceLineReview.latestPeriodEnd, fields.issueDate, today),
+    ...taxTreatmentErrors(fields, serviceLineReview.latestPeriodEnd),
+    ...exchangeErrors.map(({ fieldName, message }) => invoiceFieldError(fieldName, message)),
   ];
 }
 
-function normalizedFieldErrors(fields: NormalizedDraftFields): InvoiceDraftError[] {
+function normalizedInvoiceFieldErrors(fields: NormalizedInvoiceFields): InvoiceDraftError[] {
   const commonErrors = [
-    ...fieldError("clientLegalName", fields.clientLegalName),
-    ...fieldError("clientPostalAddress", fields.clientPostalAddress),
-    ...fieldError("serviceDescription", fields.serviceDescription),
-    ...fieldError("periodStart", fields.periodStart),
-    ...fieldError("periodEnd", fields.periodEnd),
-    ...fieldError("issueDate", fields.issueDate),
-    ...fieldError("billableDays", fields.billableDays),
-    ...fieldError("dayRate", fields.dayRate),
-    ...fieldError("paymentTerms", fields.paymentTerms),
-    ...fieldError("notes", fields.notes),
-    ...fieldError("purchaseOrder", fields.purchaseOrder),
+    ...fieldErrors("clientLegalName", fields.clientLegalName),
+    ...fieldErrors("clientPostalAddress", fields.clientPostalAddress),
+    ...fieldErrors("issueDate", fields.issueDate),
+    ...fieldErrors("paymentTerms", fields.paymentTerms),
+    ...fieldErrors("notes", fields.notes),
+    ...fieldErrors("purchaseOrder", fields.purchaseOrder),
   ];
   return fields.tax.kind === "uk-taxable"
-    ? [
-        ...commonErrors,
-        ...fieldError("taxPoint", fields.tax.taxPoint),
-        ...fieldError("vatRate", fields.tax.rate),
-      ]
+    ? [...commonErrors, ...fieldErrors("taxPoint", fields.tax.taxPoint)]
     : [
         ...commonErrors,
-        ...fieldError("outsideScopeEvidenceReference", fields.tax.evidenceReference),
+        ...fieldErrors("outsideScopeEvidenceReference", fields.tax.evidenceReference),
       ];
 }
 
@@ -482,54 +495,11 @@ function clientSelectionErrors(
   client: Client | undefined,
   clientId: string,
 ): readonly InvoiceDraftError[] {
-  return client?.id === clientId
-    ? []
-    : [{ fieldName: "clientId", message: "Choose a saved client." }];
+  return client?.id === clientId ? [] : [invoiceFieldError("clientId", "Choose a saved client.")];
 }
 
 function currencySelectionErrors(currency: Currency | undefined): readonly InvoiceDraftError[] {
-  return currency
-    ? []
-    : [{ fieldName: "currencyCode", message: "Choose a current ISO 4217 currency." }];
-}
-
-function dayRatePrecisionErrors(
-  currency: Currency | undefined,
-  dayRate: NormalizedField,
-): readonly InvoiceDraftError[] {
-  if (!currency || dayRate.kind === "invalid") return [];
-  return !amountFitsCurrencyPrecision(dayRate.value, currency.minorUnit)
-    ? [
-        {
-          fieldName: "dayRate",
-          message: `Use no more than ${currency.minorUnit} decimal places for ${currency.code}.`,
-        },
-      ]
-    : [];
-}
-
-function billablePeriodErrors(
-  periodStart: NormalizedField,
-  periodEnd: NormalizedField,
-  billableDays: NormalizedField,
-): readonly InvoiceDraftError[] {
-  if (
-    periodStart.kind === "invalid" ||
-    periodEnd.kind === "invalid" ||
-    billableDays.kind === "invalid"
-  ) {
-    return [];
-  }
-  const availableDays = inclusiveInvoicePeriodDays(periodStart.value, periodEnd.value);
-  const dayLabel = availableDays === 1 ? "day" : "days";
-  return billableDaysExceedInvoicePeriod(billableDays.value, periodStart.value, periodEnd.value)
-    ? [
-        {
-          fieldName: "billableDays",
-          message: `Billable days cannot exceed the ${availableDays} ${dayLabel} in the invoice period.`,
-        },
-      ]
-    : [];
+  return currency ? [] : [invoiceFieldError("currencyCode", "Choose a current ISO 4217 currency.")];
 }
 
 function formatTotals(
@@ -546,9 +516,10 @@ function formatTotals(
 
 function createCandidate(
   client: Client,
-  fields: NormalizedDraftFields,
+  fields: NormalizedInvoiceFields,
   currency: Currency,
   issuer: IssuerSettings,
+  serviceLines: NonEmptyReadonlyArray<ReviewedInvoiceServiceLine>,
   totals: InvoiceTotals,
   exchangeReview: Exclude<ExchangeReview, { kind: "invalid" }>,
 ): InvoiceCandidate {
@@ -559,12 +530,7 @@ function createCandidate(
       postalAddress: validFieldValue(fields.clientPostalAddress),
     },
     currency: persistedCurrencySchema.parse(currency),
-    serviceDescription: validFieldValue(fields.serviceDescription),
-    periodStart: validFieldValue(fields.periodStart),
-    periodEnd: validFieldValue(fields.periodEnd),
     issueDate: validFieldValue(fields.issueDate),
-    billableDays: validFieldValue(fields.billableDays),
-    dayRate: validFieldValue(fields.dayRate),
     paymentTerms: validFieldValue(fields.paymentTerms),
     notes: validFieldValue(fields.notes),
     purchaseOrder: validFieldValue(fields.purchaseOrder),
@@ -573,19 +539,17 @@ function createCandidate(
       client.invoiceSequence.nextNumber,
     ),
     issuer,
+    serviceLines,
     totals,
   };
-  return {
-    ...facts,
-    taxFacts: createCandidateTaxFacts(fields.tax, exchangeReview),
-  };
+  return { ...facts, taxFacts: createCandidateTaxFacts(fields.tax, exchangeReview) };
 }
 
 function createCandidateTaxFacts(
-  fields: NormalizedTaxFields,
+  tax: NormalizedInvoiceFields["tax"],
   exchangeReview: Exclude<ExchangeReview, { kind: "invalid" }>,
 ): InvoiceTaxFacts {
-  const vatTreatment = createCandidateVatTreatment(fields);
+  const vatTreatment = createCandidateVatTreatment(tax);
   if (vatTreatment.kind === "outside-scope") {
     return persistedInvoiceTaxFactsSchema.parse({ kind: "outside-scope", vatTreatment });
   }
@@ -599,98 +563,77 @@ function createCandidateTaxFacts(
   });
 }
 
-function createCandidateVatTreatment(fields: NormalizedTaxFields): InvoiceVatTreatment {
+function createCandidateVatTreatment(tax: NormalizedInvoiceFields["tax"]): InvoiceVatTreatment {
   return persistedInvoiceVatTreatmentSchema.parse(
-    fields.kind === "uk-taxable"
+    tax.kind === "uk-taxable"
       ? {
           kind: "uk-taxable",
-          rate: validFieldValue(fields.rate),
-          taxPoint: validFieldValue(fields.taxPoint),
+          taxPoint: validFieldValue(tax.taxPoint),
           wording: ukTaxableWording,
         }
       : {
-          evidenceReference: validFieldValue(fields.evidenceReference),
+          evidenceReference: validFieldValue(tax.evidenceReference),
           kind: "outside-scope",
-          reverseCharge: fields.reverseCharge,
-          wording: outsideScopeVatWording(fields.reverseCharge),
+          reverseCharge: tax.reverseCharge,
+          wording: outsideScopeVatWording(tax.reverseCharge),
         },
   );
 }
 
-function validFieldValue(field: NormalizedField): string {
-  if (field.kind === "invalid") {
-    throw new Error("A validated invoice candidate contains an invalid field");
-  }
-  return field.value;
+function serviceLineInputsAreEqual(
+  first: InvoiceDraftInput["serviceLines"],
+  second: InvoiceDraftInput["serviceLines"],
+): boolean {
+  if (first.length !== second.length) return false;
+  return first.every((serviceLine, index) => serviceLineInputsMatch(serviceLine, second[index]));
 }
 
-function fieldError(
+function serviceLineInputsMatch(
+  first: InvoiceDraftInput["serviceLines"][number],
+  second: InvoiceDraftInput["serviceLines"][number] | undefined,
+): boolean {
+  if (!second) return false;
+  const commonFields = [
+    "billableDays",
+    "dayRate",
+    "periodEnd",
+    "periodStart",
+    "serviceDescription",
+  ] as const;
+  if (!commonFields.every((fieldName) => first[fieldName] === second[fieldName])) return false;
+  if (!("vatRate" in first)) return !("vatRate" in second);
+  return "vatRate" in second && first.vatRate === second.vatRate;
+}
+
+function fieldErrors(
   fieldName: InvoiceDraftFieldName,
-  result: NormalizedField,
+  field: NormalizedField,
 ): readonly InvoiceDraftError[] {
-  return result.kind === "invalid" ? [{ fieldName, message: result.message }] : [];
+  return field.kind === "invalid" ? [invoiceFieldError(fieldName, field.message)] : [];
 }
 
-function normalizeCalendarDate(value: string, requiredMessage: string): NormalizedField {
-  const normalized = value.normalize("NFC").trim();
-  if (!normalized) return { kind: "invalid", message: requiredMessage };
-  if (!/^\d{4}-\d{2}-\d{2}$/u.test(normalized)) {
-    return { kind: "invalid", message: "Enter a real calendar date." };
-  }
-  const timestamp = Date.parse(`${normalized}T00:00:00.000Z`);
-  if (
-    !Number.isFinite(timestamp) ||
-    new Date(timestamp).toISOString().slice(0, 10) !== normalized
-  ) {
-    return { kind: "invalid", message: "Enter a real calendar date." };
-  }
-  return { kind: "valid", value: normalized };
-}
-
-function normalizeBillableDays(value: string): NormalizedField {
-  const positiveDecimal = normalizePositiveDecimal(value);
-  if (positiveDecimal.kind === "invalid") {
-    return { kind: "invalid", message: "Enter positive billable days." };
-  }
-  if (!isPositiveQuarterDayAmount(positiveDecimal.value)) {
-    return { kind: "invalid", message: "Use quarter-day increments." };
-  }
-  return positiveDecimal;
+function invoiceFieldError(fieldName: InvoiceDraftFieldName, message: string): InvoiceDraftError {
+  return { location: { fieldName, kind: "invoice" }, message };
 }
 
 function dateOrderErrors(
-  periodStart: NormalizedField,
-  periodEnd: NormalizedField,
+  latestPeriodEnd: string | null,
   issueDate: NormalizedField,
   todayValue: string,
 ): InvoiceDraftError[] {
-  const today = normalizeCalendarDate(todayValue, "Enter today's date.");
+  const today = normalizeInvoiceDate(todayValue, "Enter today's date.");
   return [
-    ...periodOrderErrors(periodStart, periodEnd),
-    ...issuePeriodOrderErrors(periodEnd, issueDate),
+    ...issuePeriodOrderErrors(latestPeriodEnd, issueDate),
     ...futureIssueDateErrors(issueDate, today),
   ];
 }
 
-function periodOrderErrors(
-  periodStart: NormalizedField,
-  periodEnd: NormalizedField,
-): readonly InvoiceDraftError[] {
-  return periodStart.kind === "valid" &&
-    periodEnd.kind === "valid" &&
-    periodStart.value > periodEnd.value
-    ? [{ fieldName: "periodEnd", message: "The period end cannot precede its start." }]
-    : [];
-}
-
 function issuePeriodOrderErrors(
-  periodEnd: NormalizedField,
+  latestPeriodEnd: string | null,
   issueDate: NormalizedField,
 ): readonly InvoiceDraftError[] {
-  return periodEnd.kind === "valid" &&
-    issueDate.kind === "valid" &&
-    periodEnd.value > issueDate.value
-    ? [{ fieldName: "issueDate", message: "The issue date cannot precede the period end." }]
+  return latestPeriodEnd && issueDate.kind === "valid" && latestPeriodEnd > issueDate.value
+    ? [invoiceFieldError("issueDate", "The issue date cannot precede the latest period end.")]
     : [];
 }
 
@@ -699,85 +642,55 @@ function futureIssueDateErrors(
   today: NormalizedField,
 ): readonly InvoiceDraftError[] {
   return issueDate.kind === "valid" && today.kind === "valid" && issueDate.value > today.value
-    ? [{ fieldName: "issueDate", message: "The issue date cannot be in the future." }]
+    ? [invoiceFieldError("issueDate", "The issue date cannot be in the future.")]
     : [];
 }
 
-function calculateTotals(
-  currency: Currency | undefined,
-  billableDays: NormalizedField,
-  dayRate: NormalizedField,
-  tax: NormalizedTaxFields,
-): InvoiceTotals | null {
-  const amounts = normalizedInvoiceAmounts(currency, billableDays, dayRate);
-  if (!amounts) return null;
-  const treatment = normalizedInvoiceTotalTreatment(tax);
-  if (!treatment) return null;
-  return calculateInvoiceTotals({
-    billableDays: amounts.billableDays,
-    dayRate: amounts.dayRate,
-    minorUnit: amounts.currency.minorUnit,
-    treatment,
-  });
-}
-
-type NormalizedInvoiceAmounts = Readonly<{
-  billableDays: string;
-  currency: Currency;
-  dayRate: string;
-}>;
-
-function normalizedInvoiceAmounts(
-  currency: Currency | undefined,
-  billableDays: NormalizedField,
-  dayRate: NormalizedField,
-): NormalizedInvoiceAmounts | null {
-  if (!currency || billableDays.kind === "invalid" || dayRate.kind === "invalid") return null;
-  if (!amountFitsCurrencyPrecision(dayRate.value, currency.minorUnit)) return null;
-  return { billableDays: billableDays.value, currency, dayRate: dayRate.value };
-}
-
-function normalizedInvoiceTotalTreatment(tax: NormalizedTaxFields): InvoiceTotalTreatment | null {
-  if (tax.kind === "outside-scope") return { kind: "outside-scope" };
-  if (tax.rate.kind === "invalid") return null;
-  return { kind: "uk-taxable", rate: tax.rate.value };
-}
-
 function taxTreatmentErrors(
-  draft: InvoiceDraftInput,
-  fields: NormalizedDraftFields,
+  fields: NormalizedInvoiceFields,
+  latestPeriodEnd: string | null,
 ): readonly InvoiceDraftError[] {
-  if (draft.vatTreatment === "outside-scope" || fields.tax.kind === "outside-scope") return [];
-
-  return taxPointOrderErrors(fields.periodEnd, fields.tax.taxPoint, fields.issueDate);
+  if (fields.tax.kind === "outside-scope") return [];
+  return taxPointOrderErrors(latestPeriodEnd, fields.tax.taxPoint, fields.issueDate);
 }
 
 function taxPointOrderErrors(
-  periodEnd: NormalizedField,
+  latestPeriodEnd: string | null,
   taxPoint: NormalizedField,
   issueDate: NormalizedField,
 ): readonly InvoiceDraftError[] {
-  if (periodEnd.kind === "invalid" || taxPoint.kind === "invalid") return [];
-  if (taxPoint.value < periodEnd.value) {
-    return [{ fieldName: "taxPoint", message: "The tax point cannot precede the period end." }];
+  if (!latestPeriodEnd || taxPoint.kind === "invalid") return [];
+  if (taxPoint.value < latestPeriodEnd) {
+    return [invoiceFieldError("taxPoint", "The tax point cannot precede the latest period end.")];
   }
   return issueDate.kind === "valid" && taxPoint.value > issueDate.value
-    ? [{ fieldName: "taxPoint", message: "The tax point cannot follow the issue date." }]
+    ? [invoiceFieldError("taxPoint", "The tax point cannot follow the issue date.")]
     : [];
 }
 
 function lateIssueWarnings(
-  periodEnd: NormalizedField,
+  latestPeriodEnd: string | null,
   issueDate: NormalizedField,
 ): readonly InvoiceDraftWarning[] {
-  if (periodEnd.kind === "invalid" || issueDate.kind === "invalid") return [];
-  return issueDateRequiresAcknowledgement(periodEnd.value, issueDate.value)
+  if (!latestPeriodEnd || issueDate.kind === "invalid") return [];
+  return issueDateRequiresAcknowledgement(latestPeriodEnd, issueDate.value)
     ? [
         {
           kind: "late-issue-date",
           message:
-            "The issue date is more than 14 days after the service period. Check the tax point before issue.",
+            "The issue date is more than 14 days after the latest service period. Check the tax point before issue.",
         },
       ]
     : [];
+}
+
+function normalizedFieldValue(field: NormalizedField): string | null {
+  return field.kind === "valid" ? field.value : null;
+}
+
+function validFieldValue(field: NormalizedField): string {
+  if (field.kind === "invalid") {
+    throw new Error("A validated invoice candidate contains an invalid field");
+  }
+  return field.value;
 }

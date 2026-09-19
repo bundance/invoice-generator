@@ -3,6 +3,7 @@ import type { IssuedInvoice } from "../../../domain/invoices/issued-invoice.ts";
 import { formatCurrencyAmount } from "../../../domain/money/decimal.ts";
 import { formatSterlingVatSummary } from "../../../documents/exchange-presentation.ts";
 import { InvoiceVatFacts } from "../../ui/invoice-vat-facts.tsx";
+import { formatVatTreatment } from "../../ui/vat-treatment-presentation.ts";
 import { RetainedDocumentActions } from "./retained-document-actions.tsx";
 
 type InvoiceHistoryItemProps = Readonly<{
@@ -22,6 +23,17 @@ export function InvoiceHistoryItem({ creditNote, invoice, onCorrect }: InvoiceHi
       : null,
     invoice.currency.code,
   );
+  const periodStart = invoice.serviceLines.reduce(
+    (earliest, line) => (line.periodStart < earliest ? line.periodStart : earliest),
+    invoice.serviceLines[0]?.periodStart ?? "",
+  );
+  const periodEnd = invoice.serviceLines.reduce(
+    (latest, line) => (line.periodEnd > latest ? line.periodEnd : latest),
+    invoice.serviceLines[0]?.periodEnd ?? "",
+  );
+  const vatRates = [
+    ...new Set(invoice.serviceLines.flatMap((line) => ("vatRate" in line ? [line.vatRate] : []))),
+  ];
 
   return (
     <article aria-label={`Invoice ${invoice.id}`} className="invoice-history-item">
@@ -48,7 +60,8 @@ export function InvoiceHistoryItem({ creditNote, invoice, onCorrect }: InvoiceHi
         <div>
           <dt>Service period</dt>
           <dd>
-            {invoice.periodStart} to {invoice.periodEnd}
+            {periodStart} to {periodEnd} · {invoice.serviceLines.length} item
+            {invoice.serviceLines.length === 1 ? "" : "s"}
           </dd>
         </div>
         <div>
@@ -65,11 +78,7 @@ export function InvoiceHistoryItem({ creditNote, invoice, onCorrect }: InvoiceHi
         </div>
         <div>
           <dt>VAT treatment</dt>
-          <dd>
-            {vatTreatment.kind === "uk-taxable"
-              ? `UK VAT at ${vatTreatment.rate}%`
-              : "Outside the scope of UK VAT"}
-          </dd>
+          <dd>{formatVatTreatment(vatTreatment.kind === "uk-taxable", vatRates)}</dd>
         </div>
         <InvoiceVatFacts
           sterlingVatDetails={sterlingVatDetails}

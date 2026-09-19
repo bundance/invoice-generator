@@ -5,21 +5,27 @@ import { normalizeExchangeRate } from "./exchange-rate.ts";
 import {
   exchangeDateApplicabilityError,
   exchangeMethods,
+  createSterlingVatSummary,
   persistedExchangeRecordSchema,
   persistedSterlingVatSummarySchema,
   type SterlingVatSummary,
 } from "./exchange-record.ts";
-import { calculateSterlingInvoiceTotals, type InvoiceTotals } from "./invoice-policy.ts";
+import type {
+  NonEmptyReadonlyArray,
+  ReviewedTaxableInvoiceServiceLine,
+} from "./invoice-service-line.ts";
+
+const requiredExchangeDraftFields = {
+  effectiveDate: z.string(),
+  evidenceReference: z.string(),
+  kind: z.literal("required"),
+  method: z.string(),
+  rate: z.string(),
+} as const;
 
 export const exchangeDraftSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("not-required") }),
-  z.strictObject({
-    effectiveDate: z.string(),
-    evidenceReference: z.string(),
-    kind: z.literal("required"),
-    method: z.string(),
-    rate: z.string(),
-  }),
+  z.strictObject(requiredExchangeDraftFields),
 ]);
 
 export type ExchangeDraftInput = Readonly<z.output<typeof exchangeDraftSchema>>;
@@ -53,11 +59,10 @@ export type ExchangeReview =
     }>;
 
 type ReviewExchangeOptions = Readonly<{
-  currencyCode: string | undefined;
+  currency: Readonly<{ code: string; minorUnit: number }> | undefined;
   exchange: ExchangeDraftInput;
+  serviceLines: NonEmptyReadonlyArray<ReviewedTaxableInvoiceServiceLine> | null;
   taxPoint: NormalizedField;
-  totals: InvoiceTotals | null;
-  vatRate: NormalizedField;
 }>;
 
 export function createExchangeDraft(currencyCode: string): ExchangeDraftInput {
@@ -96,20 +101,19 @@ export function exchangeDraftInputsAreEqual(
 }
 
 export function reviewExchange({
-  currencyCode,
+  currency,
   exchange,
+  serviceLines,
   taxPoint,
-  totals,
-  vatRate,
 }: ReviewExchangeOptions): ExchangeReview {
-  if (currencyCode === "GBP") {
+  if (currency?.code === "GBP") {
     return { errors: [], kind: "not-required", sterlingVatSummary: null };
   }
 
-  if (!currencyCode || exchange.kind === "not-required") {
+  if (!currency || exchange.kind === "not-required") {
     return {
       errors:
-        currencyCode && exchange.kind === "not-required"
+        currency && exchange.kind === "not-required"
           ? [{ fieldName: "exchangeRate", message: "Enter foreign-currency exchange evidence." }]
           : [],
       kind: "invalid",
@@ -121,8 +125,7 @@ export function reviewExchange({
   const errors = exchangeDraftErrors(fields, taxPoint);
   if (
     errors.length > 0 ||
-    !totals ||
-    vatRate.kind === "invalid" ||
+    !serviceLines ||
     taxPoint.kind === "invalid" ||
     fields.effectiveDate.kind === "invalid" ||
     fields.evidenceReference.kind === "invalid" ||
@@ -142,14 +145,17 @@ export function reviewExchange({
     return invalidExchangeReview("Enter valid exchange evidence.");
   }
 
-  const sterlingVatSummaryResult = persistedSterlingVatSummarySchema.safeParse({
-    exchangeRecord: exchangeRecordResult.data,
-    totals: calculateSterlingInvoiceTotals({
-      clientCurrencyNet: totals.net,
-      exchangeRate: exchangeRecordResult.data.rate,
-      vatRate: vatRate.value,
-    }),
-  });
+  let sterlingVatSummary: unknown;
+  try {
+    sterlingVatSummary = createSterlingVatSummary({
+      clientCurrencyMinorUnit: currency.minorUnit,
+      exchangeRecord: exchangeRecordResult.data,
+      serviceLines,
+    });
+  } catch {
+    return invalidExchangeReview("Use an exchange rate that produces storable sterling totals.");
+  }
+  const sterlingVatSummaryResult = persistedSterlingVatSummarySchema.safeParse(sterlingVatSummary);
   if (!sterlingVatSummaryResult.success) {
     return invalidExchangeReview("Use an exchange rate that produces storable sterling totals.");
   }

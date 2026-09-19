@@ -19,11 +19,11 @@ describe("issued GBP UK VAT invoice", () => {
       invoiceNumber: "8",
       currency: { code: "GBP", minorUnit: 2 },
       totals: { gross: "3480.00", net: "2900.00", vat: "580.00" },
+      serviceLines: [{ vatRate: "20" }],
       taxFacts: {
         kind: "gbp-uk-vat",
         vatTreatment: {
           kind: "uk-taxable",
-          rate: "20",
           taxPoint: "2026-09-05",
           wording: "UK VAT applies.",
         },
@@ -100,10 +100,15 @@ function createGbpVatInvoice() {
     client: completeGbpVatClient,
     draft: {
       ...draft,
-      billableDays: "4",
       issueDate: "2026-09-06",
-      periodEnd: "2026-09-05",
-      periodStart: "2026-09-02",
+      serviceLines: [
+        {
+          ...draft.serviceLines[0],
+          billableDays: "4",
+          periodEnd: "2026-09-05",
+          periodStart: "2026-09-02",
+        },
+      ],
       taxPoint: "2026-09-05",
     },
     issuer: completeIssuer,

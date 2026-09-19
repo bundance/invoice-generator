@@ -82,8 +82,9 @@ describe("invoice application", () => {
           totals: { gross: "3480.00", net: "2900.00", vat: "580.00" },
           taxFacts: {
             kind: "gbp-uk-vat",
-            vatTreatment: { kind: "uk-taxable", rate: "20", taxPoint: "2026-09-05" },
+            vatTreatment: { kind: "uk-taxable", taxPoint: "2026-09-05" },
           },
+          serviceLines: [{ vatRate: "20" }],
         },
       },
       { kind: "invalid" },
@@ -316,9 +317,14 @@ describe("invoice application", () => {
     let issueCommitCount = 0;
     const lateDraft = persistedInvoiceDraftSchema.parse({
       ...completeInvoiceDraftInput,
-      billableDays: "1",
-      periodStart: "2026-08-01",
-      periodEnd: "2026-08-01",
+      serviceLines: [
+        {
+          ...completeInvoiceDraftInput.serviceLines[0],
+          billableDays: "1",
+          periodStart: "2026-08-01",
+          periodEnd: "2026-08-01",
+        },
+      ],
     });
     const baseWorkspaceRepository = memoryWorkspaceRepository({
       ...initialWorkspaceState,
@@ -414,10 +420,12 @@ describe("invoice application", () => {
       currentBusinessDate: fixedBusinessDate,
       workspaceRepository,
     });
+    const baseDraft = createInvoiceDraft(completeClient);
+    if (baseDraft.vatTreatment !== "outside-scope") throw new Error("Expected outside-scope draft");
     const draft = {
-      ...createInvoiceDraft(completeClient),
-      billableDays: "not a number yet",
+      ...baseDraft,
       notes: "Work in progress",
+      serviceLines: [{ ...baseDraft.serviceLines[0], billableDays: "not a number yet" }] as const,
     };
 
     await expect(invoiceApplication.saveInvoiceDraft(draft)).resolves.toEqual({

@@ -9,6 +9,7 @@ import {
   type InvoiceDraft,
   type InvoiceDraftInput,
   invoiceDraftInputsAreEqual,
+  parseInvoiceDraftInput,
 } from "../../../domain/invoices/invoice-draft.ts";
 import { useAutosave, type AutosavePolicy } from "../../hooks/use-autosave.ts";
 
@@ -29,8 +30,8 @@ export function useInvoiceDraftForm({
     defaultValues: initialInput,
   });
   const autosavePolicy = useMemo(
-    () => createInvoiceDraftAutosavePolicy(window.invoiceApp, onDraftChanged, reset),
-    [onDraftChanged, reset],
+    () => createInvoiceDraftAutosavePolicy(window.invoiceApp, onDraftChanged, getValues, reset),
+    [getValues, onDraftChanged, reset],
   );
   const autosave = useAutosave({
     initialInput,
@@ -137,6 +138,7 @@ export function useInvoiceDraftForm({
     changeCurrency,
     control,
     discard,
+    getValues,
     issued,
     initializeForFirstClient,
     openSavedDraft,
@@ -166,14 +168,17 @@ export type InvoiceDraftForm = ReturnType<typeof useInvoiceDraftForm>;
 function createInvoiceDraftAutosavePolicy(
   invoiceApp: typeof window.invoiceApp,
   onDraftChanged: (draft: InvoiceDraft | null) => void,
+  readDraft: () => InvoiceDraftInput,
   reset: (input: InvoiceDraftInput) => void,
 ): AutosavePolicy<InvoiceDraftInput, InvoiceDraft> {
   return {
     inputFromSavedValue: (draft) => draft,
     inputMatchesSavedValue: (input, savedDraft) => invoiceDraftInputsAreEqual(savedDraft, input),
-    onInputCanonicalized: reset,
+    onInputCanonicalized: (input) => {
+      if (!invoiceDraftInputsAreEqual(input, readDraft())) reset(input);
+    },
     onSaved: onDraftChanged,
-    prepareInput: (input) => ({ kind: "ready", input }),
+    prepareInput: (input) => ({ kind: "ready", input: parseInvoiceDraftInput(input) }),
     requestSave: async (input) => {
       try {
         const result = await invoiceApp.saveInvoiceDraft(input);

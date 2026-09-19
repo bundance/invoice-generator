@@ -20,6 +20,8 @@ import {
   fullWorkspaceStateConversions,
   supportedWorkspaceStateConversions,
 } from "../../../tests/fixtures/workspace-state-conversions.js";
+import { releasedWorkspaceStateV6Schema } from "./released-workspace-state-schemas.js";
+import { upgradeSchemaSixWorkspaceState } from "./workspace-state-migration.js";
 
 const { draft: _draft, ...workspaceWithoutDraft } = initialWorkspaceState;
 const legacyInitialWorkspaceState = {
@@ -29,17 +31,51 @@ const legacyInitialWorkspaceState = {
 };
 
 describe("workspace state", () => {
+  it("freezes the released schema 6 wire shape before schema 7 changes", () => {
+    const releasedState = fullWorkspaceStateConversions.at(-1)?.expectedV6;
+
+    expect(releasedWorkspaceStateV6Schema.parse(releasedState)).toStrictEqual(releasedState);
+    expect(
+      releasedWorkspaceStateV6Schema.safeParse({
+        ...releasedState,
+        futureWorkspaceField: true,
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each([...supportedWorkspaceStateConversions, ...fullWorkspaceStateConversions])(
+    "funnels the schema-v$schemaVersion release fixture through one literal schema 6 to 7 migration",
+    ({ expectedV6 }) => {
+      const schemaSix = releasedWorkspaceStateV6Schema.parse(expectedV6);
+      const schemaSeven = upgradeSchemaSixWorkspaceState(schemaSix);
+
+      expect(schemaSeven.schemaVersion).toBe(7);
+      expect(schemaSeven.draft?.draft.serviceLines ?? null).toEqual(
+        expectedDraftServiceLines(schemaSix),
+      );
+      expect(schemaSeven.draft ? "serviceDescription" in schemaSeven.draft.draft : false).toBe(
+        false,
+      );
+      expectIssuedInvoicesMigrated(schemaSix, schemaSeven);
+      expectCreditNotesMigrated(schemaSix, schemaSeven);
+    },
+  );
+
   it.each(supportedWorkspaceStateConversions)(
     "converts the schema-v$schemaVersion release fixture exactly",
     ({ expectedV6, inputJson }) => {
-      expect(parseWorkspaceState(inputJson)).toStrictEqual(expectedV6);
+      expect(parseWorkspaceState(inputJson)).toStrictEqual(
+        upgradeSchemaSixWorkspaceState(releasedWorkspaceStateV6Schema.parse(expectedV6)),
+      );
     },
   );
 
   it.each(fullWorkspaceStateConversions)(
     "converts the complete schema-v$schemaVersion release snapshot from $sourceCommit",
     ({ expectedV6, inputJson }) => {
-      expect(parseWorkspaceState(inputJson)).toStrictEqual(expectedV6);
+      expect(parseWorkspaceState(inputJson)).toStrictEqual(
+        upgradeSchemaSixWorkspaceState(releasedWorkspaceStateV6Schema.parse(expectedV6)),
+      );
     },
   );
 
@@ -121,7 +157,7 @@ describe("workspace state", () => {
         issuedInvoices: [],
       }),
     ],
-    ["newer-version", JSON.stringify({ ...initialWorkspaceState, schemaVersion: 7 })],
+    ["newer-version", JSON.stringify({ ...initialWorkspaceState, schemaVersion: 8 })],
   ] as const)("classifies %s state for recovery", (problem, stateJson) => {
     expect(() => parseWorkspaceState(stateJson)).toThrow(
       expect.objectContaining<Partial<WorkspaceRecoveryError>>({ problem }),
@@ -225,7 +261,7 @@ describe("workspace state", () => {
       }),
     );
 
-    expect(upgradedState.schemaVersion).toBe(6);
+    expect(upgradedState.schemaVersion).toBe(7);
     expect(upgradedState.clients[0]).not.toHaveProperty("creditNoteSequence");
   });
 
@@ -259,7 +295,8 @@ describe("workspace state", () => {
 
   it("converts a legacy outside-scope draft to the current draft contract", () => {
     const currentOutsideScopeDraft = createInvoiceDraft(completeClient);
-    const { vatTreatment, ...legacyOutsideScopeDraft } = currentOutsideScopeDraft;
+    const { serviceLines: _serviceLines, vatTreatment, ...draftFields } = currentOutsideScopeDraft;
+    const legacyOutsideScopeDraft = { ...draftFields, ...currentOutsideScopeDraft.serviceLines[0] };
     expect(vatTreatment).toBe("outside-scope");
 
     const upgradedState = parseWorkspaceState(
@@ -277,13 +314,18 @@ describe("workspace state", () => {
     );
 
     expect(upgradedState).toMatchObject({
-      schemaVersion: 6,
+      schemaVersion: 7,
       draft: { kind: "ordinary", draft: currentOutsideScopeDraft },
     });
   });
 
   it("converts schema-v2 UK VAT drafts and invoices to finalized tax facts", () => {
-    const { exchange: _exchange, ...legacyDraft } = completeGbpVatInvoiceDraftInput;
+    const {
+      exchange: _exchange,
+      serviceLines: _serviceLines,
+      ...draftFields
+    } = completeGbpVatInvoiceDraftInput;
+    const legacyDraft = { ...draftFields, ...completeGbpVatInvoiceDraftInput.serviceLines[0] };
     const legacyInvoice = createSchemaTwoGbpVatIssuedInvoice();
 
     const upgradedState = parseWorkspaceState(
@@ -302,7 +344,7 @@ describe("workspace state", () => {
     );
 
     expect(upgradedState).toMatchObject({
-      schemaVersion: 6,
+      schemaVersion: 7,
       draft: { kind: "ordinary", draft: { exchange: { kind: "not-required" } } },
       issuedInvoices: [{ taxFacts: { kind: "gbp-uk-vat" } }],
     });
@@ -368,11 +410,11 @@ describe("workspace state", () => {
         kind: "gbp-uk-vat",
         vatTreatment: {
           kind: "uk-taxable",
-          rate: "20",
           taxPoint: "2026-09-05",
           wording: "UK VAT applies.",
         },
       },
+      serviceLines: [{ vatRate: "20" }],
     });
   });
 
@@ -529,8 +571,71 @@ function createSchemaTwoGbpVatIssuedInvoice() {
   }
   const {
     replacesInvoiceId: _replacesInvoiceId,
+    serviceLines,
     taxFacts,
     ...legacyInvoiceFields
   } = completeGbpVatIssuedInvoice;
-  return { ...legacyInvoiceFields, vatTreatment: taxFacts.vatTreatment };
+  const [serviceLine] = serviceLines;
+  if (!serviceLine || !("vatRate" in serviceLine)) throw new Error("Expected taxable service line");
+  const { totals: _lineTotals, vatRate, ...flatServiceLine } = serviceLine;
+  return {
+    ...legacyInvoiceFields,
+    ...flatServiceLine,
+    vatTreatment: { ...taxFacts.vatTreatment, rate: vatRate },
+  };
+}
+
+type SchemaSix = ReturnType<typeof releasedWorkspaceStateV6Schema.parse>;
+type SchemaSeven = ReturnType<typeof upgradeSchemaSixWorkspaceState>;
+type FlatReleasedDocument = SchemaSix["issuedInvoices"][number] | SchemaSix["creditNotes"][number];
+
+function expectedDraftServiceLines(schemaSix: SchemaSix) {
+  const flatDraft = schemaSix.draft?.draft;
+  if (!flatDraft) return null;
+  const commonLine = {
+    billableDays: flatDraft.billableDays,
+    dayRate: flatDraft.dayRate,
+    periodEnd: flatDraft.periodEnd,
+    periodStart: flatDraft.periodStart,
+    serviceDescription: flatDraft.serviceDescription,
+  };
+  return flatDraft.vatTreatment === "uk-taxable"
+    ? [{ ...commonLine, vatRate: flatDraft.vatRate }]
+    : [commonLine];
+}
+
+function expectIssuedInvoicesMigrated(schemaSix: SchemaSix, schemaSeven: SchemaSeven): void {
+  expectDocumentsMigrated(schemaSix.issuedInvoices, schemaSeven.issuedInvoices);
+}
+
+function expectCreditNotesMigrated(schemaSix: SchemaSix, schemaSeven: SchemaSeven): void {
+  expectDocumentsMigrated(schemaSix.creditNotes, schemaSeven.creditNotes);
+}
+
+function expectDocumentsMigrated(
+  flatDocuments: readonly FlatReleasedDocument[],
+  migratedDocuments: readonly Readonly<{
+    retainedPdf: FlatReleasedDocument["retainedPdf"];
+    serviceLines: readonly unknown[];
+  }>[],
+): void {
+  for (const [index, document] of flatDocuments.entries()) {
+    const migratedDocument = migratedDocuments[index];
+    expect(migratedDocument?.serviceLines).toEqual([expectedMigratedLine(document)]);
+    expect(migratedDocument?.retainedPdf).toEqual(document.retainedPdf);
+  }
+}
+
+function expectedMigratedLine(document: FlatReleasedDocument) {
+  const commonLine = {
+    billableDays: document.billableDays,
+    dayRate: document.dayRate,
+    periodEnd: document.periodEnd,
+    periodStart: document.periodStart,
+    serviceDescription: document.serviceDescription,
+    totals: document.totals,
+  };
+  return document.taxFacts.vatTreatment.kind === "uk-taxable"
+    ? { ...commonLine, vatRate: document.taxFacts.vatTreatment.rate }
+    : commonLine;
 }

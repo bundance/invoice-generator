@@ -68,7 +68,7 @@ test("a GBP UK VAT invoice keeps exact tax facts and retained evidence after res
     await expect(preview).toContainText("GBP 2,900.00");
     await expect(preview).toContainText("GBP 580.00");
     await expect(preview).toContainText("GBP 3,480.00");
-    await expect(preview).toContainText("VAT rate: 20%");
+    await expect(preview.getByRole("row", { name: /20%/u })).toBeVisible();
     await expect(preview).toContainText("Tax point: 2026-09-05");
     await expectPreviewFits(preview);
 
@@ -110,12 +110,12 @@ test("a GBP UK VAT invoice keeps exact tax facts and retained evidence after res
     if (!invoice) throw new Error("Expected one issued GBP VAT invoice");
     expect(invoice).toMatchObject({
       id: "ACME-0008",
+      serviceLines: [{ vatRate: "20" }],
       totals: { gross: "3480.00", net: "2900.00", vat: "580.00" },
       taxFacts: {
         kind: "gbp-uk-vat",
         vatTreatment: {
           kind: "uk-taxable",
-          rate: "20",
           taxPoint: "2026-09-05",
           wording: "UK VAT applies.",
         },
@@ -133,7 +133,7 @@ test("a GBP UK VAT invoice keeps exact tax facts and retained evidence after res
         "GBP 580.00",
         "GBP 3,480.00",
         "Tax point: 2026-09-05",
-        "VAT rate: 20%",
+        "20%",
         "UK VAT applies.",
         "VAT Registration Number 388 8021 60",
         "Company Reg. No. 8822243",
@@ -326,7 +326,7 @@ test("a foreign-currency UK VAT invoice retains sterling evidence and exact PDF 
   }
 });
 
-test("an outside-scope invoice issues once and retains its exact PDF after restart", async ({
+test("a multi-item invoice recovers, credits, replaces, and retains exact PDFs", async ({
   browserName: _browserName,
 }, testInfo) => {
   const userDataPath = await createUserDataPath("invoice-issue");
@@ -342,18 +342,49 @@ test("an outside-scope invoice issues once and retains its exact PDF after resta
 
   try {
     let page = await electronApp.firstWindow();
+    const browserWindow = await electronApp.browserWindow(page);
+    await browserWindow.evaluate((window) => window.setContentSize(1040, 820));
     await completeDraftForIssue(page);
+    await page.getByRole("tab", { name: "Work" }).click();
+    await page.getByRole("button", { name: "+ Add item" }).click();
+    const secondItem = page.getByRole("region", { name: /^2/u });
+    await secondItem.getByLabel("Service description").fill("Architecture workshop");
+    await secondItem.getByLabel("Period start").fill("2026-09-03");
+    await secondItem.getByLabel("Period end").fill("2026-09-04");
+    await secondItem.getByLabel("Billable days").fill("2");
+    await secondItem.getByLabel("Day rate").fill("500");
+    await expect(page.getByText("Saved on this Mac")).toBeVisible();
+    await expectPreviewFits(page.getByLabel("Invoice preview"));
+
+    const recoverableState = await readWorkspaceState(userDataPath);
+    expect(recoverableState.draft?.draft.serviceLines).toHaveLength(2);
+    await closeApp(electronApp);
+    electronApp = await launchProductionApp(userDataPath);
+    page = await electronApp.firstWindow();
+    await page.getByRole("button", { name: "Resume draft" }).click();
+    await page.getByRole("tab", { name: "Work" }).click();
+    await expect(page.getByRole("button", { name: /Architecture workshop/ })).toBeVisible();
     await reviewAndIssueInvoice(page);
 
     const invoiceRecord = page.getByRole("article", { name: "Invoice GGIOHK-0043" });
     await expect(invoiceRecord).toBeVisible();
-    await expect(invoiceRecord).toContainText("USD 2,900.00");
+    await expect(invoiceRecord).toContainText("USD 3,900.00");
     const issuedState = await readWorkspaceState(userDataPath);
     expect(issuedState.draft).toBeNull();
     expect(issuedState.clients[0]?.invoiceSequence.nextNumber).toBe("44");
     expect(issuedState.issuedInvoices).toHaveLength(1);
     const issuedInvoice = issuedState.issuedInvoices[0];
     if (!issuedInvoice) throw new Error("Expected one issued invoice");
+    expect(issuedInvoice.serviceLines).toMatchObject([
+      {
+        serviceDescription: "React Native consultancy\nProject delivery",
+        totals: { gross: "2900.00", net: "2900.00", vat: "0.00" },
+      },
+      {
+        serviceDescription: "Architecture workshop",
+        totals: { gross: "1000.00", net: "1000.00", vat: "0.00" },
+      },
+    ]);
     const retainedPdfPath = join(userDataPath, "retained-pdfs", issuedInvoice.retainedPdf.filename);
     const retainedBytes = await readFile(retainedPdfPath);
     expect(createHash("sha256").update(retainedBytes).digest("hex")).toBe(
@@ -366,7 +397,8 @@ test("an outside-scope invoice issues once and retains its exact PDF after resta
       requiredText: [
         "INVOICE GGIOHK-0043",
         "Genesis Global",
-        "USD 2,900.00",
+        "Architecture workshop",
+        "USD 3,900.00",
         "Outside the scope of UK VAT.",
         "Company Reg. No. 8822243",
       ],
@@ -377,13 +409,21 @@ test("an outside-scope invoice issues once and retains its exact PDF after resta
     expect(creditedState.issuedInvoices).toEqual(issuedState.issuedInvoices);
     expect(creditedState.clients[0]?.invoiceSequence.nextNumber).toBe("44");
     expect(creditedState.creditNotes).toHaveLength(1);
+    expect(creditedState.creditNotes[0]).toMatchObject({
+      serviceLines: [
+        { billableDays: "-4", totals: { gross: "-2900.00", net: "-2900.00", vat: "0.00" } },
+        { billableDays: "-2", totals: { gross: "-1000.00", net: "-1000.00", vat: "0.00" } },
+      ],
+      totals: { gross: "-3900.00", net: "-3900.00", vat: "0.00" },
+    });
     await verifyRetainedInvoicePdf({
       rasterBaselinePath: join(pdfBaselineDirectory, "full-credit-note-144dpi.png"),
       pdfPath: join(userDataPath, "retained-pdfs", "CN-GGIOHK-0043.pdf"),
       requiredText: [
         "CREDIT NOTE CN-GGIOHK-0043",
         "References invoice GGIOHK-0043, issued 2026-09-04",
-        "USD -2,900.00",
+        "Architecture workshop",
+        "USD -3,900.00",
         "Outside the scope of UK VAT.",
         "The billed service period was incorrect.",
       ],
@@ -422,6 +462,12 @@ test("an outside-scope invoice issues once and retains its exact PDF after resta
     expect(replacementDraftState.draft).toMatchObject({
       kind: "replacement",
       source: "GGIOHK-0043",
+      draft: {
+        serviceLines: [
+          { serviceDescription: "React Native consultancy\nProject delivery" },
+          { serviceDescription: "Architecture workshop" },
+        ],
+      },
     });
 
     await closeApp(electronApp);
@@ -489,7 +535,8 @@ test("an outside-scope invoice issues once and retains its exact PDF after resta
       requiredText: [
         "INVOICE GGIOHK-0044",
         "Genesis Global",
-        "USD 2,900.00",
+        "Architecture workshop",
+        "USD 3,900.00",
         "Outside the scope of UK VAT.",
       ],
       workingDirectory: join(userDataPath, "replacement-pdf-verification"),
@@ -532,13 +579,19 @@ test("an outside-scope invoice issues once and retains its exact PDF after resta
       requiredText: [
         "CREDIT NOTE CN-GGIOHK-0044",
         "References invoice GGIOHK-0044, issued 2026-09-08",
-        "USD -2,900.00",
+        "Architecture workshop",
+        "USD -3,900.00",
       ],
       workingDirectory: join(userDataPath, "second-credit-note-pdf-verification"),
     });
     await verifyRetainedInvoicePdf({
       pdfPath: join(userDataPath, "retained-pdfs", "GGIOHK-0045.pdf"),
-      requiredText: ["INVOICE GGIOHK-0045", "Genesis Global", "USD 2,900.00"],
+      requiredText: [
+        "INVOICE GGIOHK-0045",
+        "Genesis Global",
+        "Architecture workshop",
+        "USD 3,900.00",
+      ],
       workingDirectory: join(userDataPath, "second-replacement-pdf-verification"),
     });
 

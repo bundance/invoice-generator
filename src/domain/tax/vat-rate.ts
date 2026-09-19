@@ -1,4 +1,13 @@
+import { z } from "zod";
+
 import { normalizeBoundedField, type NormalizedField } from "../validation/text-field.ts";
+
+export const persistedVatRateSchema = z.string().superRefine((value, context) => {
+  const normalized = normalizeVatRate(value);
+  if (normalized.kind === "invalid" || normalized.value !== value) {
+    context.addIssue({ code: "custom", message: "Use a canonical VAT rate." });
+  }
+});
 
 export function normalizeVatRate(value: string): NormalizedField {
   const normalizedField = normalizeBoundedField(value, 200);

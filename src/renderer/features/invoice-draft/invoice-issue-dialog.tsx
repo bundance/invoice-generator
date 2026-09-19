@@ -34,6 +34,17 @@ export function InvoiceIssueDialog({
       : null,
     candidate.currency.code,
   );
+  const periodStart = candidate.serviceLines.reduce(
+    (earliest, line) => (line.periodStart < earliest ? line.periodStart : earliest),
+    candidate.serviceLines[0].periodStart,
+  );
+  const periodEnd = candidate.serviceLines.reduce(
+    (latest, line) => (line.periodEnd > latest ? line.periodEnd : latest),
+    candidate.serviceLines[0].periodEnd,
+  );
+  const vatRates = [
+    ...new Set(candidate.serviceLines.flatMap((line) => ("vatRate" in line ? [line.vatRate] : []))),
+  ];
 
   return (
     <ModalDialog
@@ -57,7 +68,8 @@ export function InvoiceIssueDialog({
         <div>
           <dt>Service period</dt>
           <dd>
-            {candidate.periodStart} to {candidate.periodEnd}
+            {periodStart} to {periodEnd} · {candidate.serviceLines.length} item
+            {candidate.serviceLines.length === 1 ? "" : "s"}
           </dd>
         </div>
         <div>
@@ -83,12 +95,10 @@ export function InvoiceIssueDialog({
           </dd>
         </div>
         {vatTreatment.kind === "uk-taxable" ? (
-          <>
-            <div>
-              <dt>VAT rate</dt>
-              <dd>{vatTreatment.rate}%</dd>
-            </div>
-          </>
+          <div>
+            <dt>VAT rates</dt>
+            <dd>{vatRates.map((rate) => `${rate}%`).join(", ")}</dd>
+          </div>
         ) : null}
         <InvoiceVatFacts
           sterlingVatDetails={sterlingVatDetails}

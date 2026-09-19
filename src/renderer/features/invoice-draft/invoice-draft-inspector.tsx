@@ -19,6 +19,7 @@ import {
 } from "./replacement-draft-notice.tsx";
 import { useInvoiceDraftReview, type DraftSection } from "./use-invoice-draft-review.ts";
 import { useInvoiceIssue } from "./use-invoice-issue.ts";
+import { useInvoiceDraftItems } from "./use-invoice-draft-items.ts";
 
 type InvoiceDraftInspectorProps = Readonly<{
   clients: readonly Client[];
@@ -59,7 +60,8 @@ export function InvoiceDraftInspector({
     },
     saveBeforeReview: draftForm.saveBeforeReview,
   });
-  const reviewState = useInvoiceDraftReview(draft, review, onDiscard, issue.review);
+  const items = useInvoiceDraftItems({ draftForm, selectedClient });
+  const reviewState = useInvoiceDraftReview(draft, review, items, onDiscard, issue.review);
 
   return (
     <>
@@ -123,9 +125,14 @@ export function InvoiceDraftInspector({
             role="tabpanel"
           >
             <InvoiceWorkFields
+              draft={draft}
               draftForm={draftForm}
               errorFor={reviewState.errorFor}
+              items={items}
               onFieldBlur={reviewState.onFieldBlur}
+              onServiceLineFieldBlur={reviewState.onServiceLineFieldBlur}
+              review={review}
+              serviceLineErrorFor={reviewState.serviceLineErrorFor}
             />
           </section>
           <section

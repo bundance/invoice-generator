@@ -16,7 +16,7 @@ export type WorkspaceDraft =
   | Readonly<{ kind: "replacement" } & ReplacementDraft>;
 
 export type WorkspaceState = Readonly<{
-  schemaVersion: 6;
+  schemaVersion: 7;
   issuer: IssuerSettings | null;
   clients: readonly Client[];
   draft: WorkspaceDraft | null;
@@ -26,7 +26,7 @@ export type WorkspaceState = Readonly<{
 }>;
 
 export const initialWorkspaceState: WorkspaceState = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   issuer: null,
   clients: [],
   draft: null,

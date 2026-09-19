@@ -46,7 +46,7 @@ test("fresh production launch creates the fixed local workspace", async () => {
 
     const state = JSON.parse(await readFile(join(userDataPath, "state.json"), "utf8"));
     expect(state).toEqual({
-      schemaVersion: 6,
+      schemaVersion: 7,
       issuer: null,
       clients: [],
       draft: null,

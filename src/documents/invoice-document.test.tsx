@@ -44,6 +44,30 @@ describe("billing document", () => {
     ).toBeVisible();
   });
 
+  it("renders every immutable service line in order before one totals block", () => {
+    const firstLine = completeIssuedInvoice.serviceLines[0];
+    if (!firstLine) throw new Error("Expected an issued service line");
+    const itemizedInvoice = persistedIssuedInvoiceSchema.parse({
+      ...completeIssuedInvoice,
+      serviceLines: [
+        { ...firstLine, serviceDescription: "Discovery workshop" },
+        { ...firstLine, serviceDescription: "Delivery sprint" },
+      ],
+      totals: { gross: "5800.00", net: "5800.00", vat: "0.00" },
+    });
+
+    const { container } = render(
+      <BillingDocument model={createIssuedInvoiceDocumentModel(itemizedInvoice)} />,
+    );
+
+    const rows = container.querySelectorAll<HTMLElement>(".service-row");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent("Discovery workshop");
+    expect(within(rows.item(0)).getByText("USD 2,900.00")).toBeVisible();
+    expect(rows[1]).toHaveTextContent("Delivery sprint");
+    expect(container.querySelectorAll('[data-fit-region="subtotal-net"]')).toHaveLength(1);
+  });
+
   it("renders the statutory sterling VAT summary from its immutable snapshot", () => {
     if (completeForeignCurrencyVatIssuedInvoice.taxFacts.kind !== "foreign-currency-uk-vat") {
       throw new Error("Expected foreign-currency VAT evidence");

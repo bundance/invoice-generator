@@ -229,6 +229,13 @@ const issuedInvoicesV3ToV5Schema = z
   .array(issuedInvoiceV3ToV5Schema)
   .superRefine(checkUniqueInvoiceIds)
   .readonly();
+const issuedInvoiceV6Schema = issuedInvoiceV3ToV5Schema.extend({
+  replacesInvoiceId: issuedInvoiceCommonFields.id.nullable().default(null),
+});
+const issuedInvoicesV6Schema = z
+  .array(issuedInvoiceV6Schema)
+  .superRefine(checkUniqueInvoiceIds)
+  .readonly();
 
 const creditNoteSchema = z.strictObject({
   id: z.string().regex(/^CN-[A-Z0-9]{2,12}-\d{4,}$/u),
@@ -236,48 +243,46 @@ const creditNoteSchema = z.strictObject({
   originalIssueDate: z.iso.date(),
   reason: requiredTextSchema,
   client: issuedInvoiceCommonFields.client,
-  currency: currencySchema,
-  serviceDescription: requiredTextSchema,
-  periodStart: z.iso.date(),
-  periodEnd: z.iso.date(),
-  billableDays: requiredTextSchema,
-  dayRate: requiredTextSchema,
-  paymentTerms: requiredTextSchema,
-  notes: z.string(),
-  purchaseOrder: z.string(),
-  issuer: issuerSchema,
-  totals: z.strictObject({
-    net: requiredTextSchema,
-    vat: requiredTextSchema,
-    gross: requiredTextSchema,
-  }),
+  currency: issuedInvoiceCommonFields.currency,
+  serviceDescription: issuedInvoiceCommonFields.serviceDescription,
+  periodStart: issuedInvoiceCommonFields.periodStart,
+  periodEnd: issuedInvoiceCommonFields.periodEnd,
+  billableDays: issuedInvoiceCommonFields.billableDays,
+  dayRate: issuedInvoiceCommonFields.dayRate,
+  paymentTerms: issuedInvoiceCommonFields.paymentTerms,
+  notes: issuedInvoiceCommonFields.notes,
+  purchaseOrder: issuedInvoiceCommonFields.purchaseOrder,
+  issuer: issuedInvoiceCommonFields.issuer,
+  totals: issuedInvoiceCommonFields.totals,
   taxFacts: invoiceTaxFactsSchema,
   issue: z.strictObject({
     date: z.iso.date(),
     timestamp: z.iso.datetime(),
     businessTimezone: requiredTextSchema,
   }),
-  retainedPdf: z.strictObject({
-    filename: z.string().regex(/\.pdf$/u),
-    sha256: z.string().regex(/^[a-f0-9]{64}$/u),
-  }),
+  retainedPdf: issuedInvoiceCommonFields.retainedPdf,
 });
 const creditNotesV4ToV5Schema = z
   .array(creditNoteSchema)
-  .superRefine((creditNotes, context) => {
-    const invoiceIds = new Set<string>();
-    for (const [index, creditNote] of creditNotes.entries()) {
-      if (invoiceIds.has(creditNote.originalInvoiceId)) {
-        context.addIssue({
-          code: "custom",
-          message: "An invoice can have only one full credit note.",
-          path: [index, "originalInvoiceId"],
-        });
-      }
-      invoiceIds.add(creditNote.originalInvoiceId);
-    }
-  })
+  .superRefine(checkUniqueOriginalInvoiceIds)
   .readonly();
+const creditNoteV6Schema = creditNoteSchema.extend({
+  replacesInvoiceId: issuedInvoiceCommonFields.id.nullable().default(null),
+});
+const creditNotesV6Schema = z
+  .array(creditNoteV6Schema)
+  .superRefine(checkUniqueOriginalInvoiceIds)
+  .readonly();
+
+const replacementDraftSourceSchema = issuedInvoiceCommonFields.id;
+const workspaceDraftV6Schema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("ordinary"), draft: draftV3ToV5Schema }),
+  z.strictObject({
+    kind: z.literal("replacement"),
+    draft: draftV3ToV5Schema,
+    source: replacementDraftSourceSchema,
+  }),
+]);
 
 const workspaceFields = {
   issuer: issuerSchema.nullable(),
@@ -327,6 +332,15 @@ export const releasedWorkspaceStateV5Schema = z.strictObject({
   issuedInvoices: issuedInvoicesV3ToV5Schema,
   creditNotes: creditNotesV4ToV5Schema,
 });
+export const releasedWorkspaceStateV6Schema = z.strictObject({
+  schemaVersion: z.literal(6),
+  issuer: issuerSchema.nullable(),
+  clients: clientsV5Schema,
+  draft: workspaceDraftV6Schema.nullable(),
+  issuedInvoices: issuedInvoicesV6Schema,
+  creditNotes: creditNotesV6Schema,
+  voidedInvoiceNumbers: emptyListSchema,
+});
 
 function checkReleasedClientCollection(
   clients: readonly z.output<typeof clientV1ToV4Schema>[],
@@ -375,6 +389,23 @@ function checkUniqueInvoiceIds(
   const ids = new Set<string>();
   for (const [index, invoice] of invoices.entries()) {
     addDuplicateIssue(ids, invoice.id, context, [index, "id"]);
+  }
+}
+
+function checkUniqueOriginalInvoiceIds(
+  creditNotes: readonly Readonly<{ originalInvoiceId: string }>[],
+  context: z.core.$RefinementCtx,
+): void {
+  const invoiceIds = new Set<string>();
+  for (const [index, creditNote] of creditNotes.entries()) {
+    if (invoiceIds.has(creditNote.originalInvoiceId)) {
+      context.addIssue({
+        code: "custom",
+        message: "An invoice can have only one full credit note.",
+        path: [index, "originalInvoiceId"],
+      });
+    }
+    invoiceIds.add(creditNote.originalInvoiceId);
   }
 }
 

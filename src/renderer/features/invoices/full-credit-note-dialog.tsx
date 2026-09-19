@@ -3,6 +3,7 @@ import { useRef } from "react";
 import type { FullCreditNoteCandidate } from "../../../domain/invoices/credit-note.ts";
 import { formatCurrencyAmount } from "../../../domain/money/decimal.ts";
 import { ModalDialog } from "../../ui/modal-dialog.tsx";
+import { formatVatTreatment } from "../../ui/vat-treatment-presentation.ts";
 
 type FullCreditNoteDialogProps = Readonly<{
   candidate: FullCreditNoteCandidate;
@@ -24,6 +25,9 @@ export function FullCreditNoteDialog({
     candidate.currency.minorUnit,
   );
   const { vatTreatment } = candidate.taxFacts;
+  const vatRates = [
+    ...new Set(candidate.serviceLines.flatMap((line) => ("vatRate" in line ? [line.vatRate] : []))),
+  ];
 
   return (
     <ModalDialog
@@ -50,11 +54,7 @@ export function FullCreditNoteDialog({
         </div>
         <div>
           <dt>VAT treatment</dt>
-          <dd>
-            {vatTreatment.kind === "uk-taxable"
-              ? `UK VAT at ${vatTreatment.rate}%`
-              : "Outside the scope of UK VAT"}
-          </dd>
+          <dd>{formatVatTreatment(vatTreatment.kind === "uk-taxable", vatRates)}</dd>
         </div>
         <div>
           <dt>Correction reason</dt>

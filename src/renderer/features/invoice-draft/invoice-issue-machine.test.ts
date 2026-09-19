@@ -58,12 +58,19 @@ describe("invoice issue state machine", () => {
 });
 
 function validDraft() {
+  const draft = createInvoiceDraft(completeClient);
+  if (draft.vatTreatment !== "outside-scope") throw new Error("Expected outside-scope draft");
   return {
-    ...createInvoiceDraft(completeClient),
-    billableDays: "4",
+    ...draft,
     issueDate: "2026-09-04",
-    periodEnd: "2026-09-04",
-    periodStart: "2026-09-01",
+    serviceLines: [
+      {
+        ...draft.serviceLines[0],
+        billableDays: "4",
+        periodEnd: "2026-09-04",
+        periodStart: "2026-09-01",
+      },
+    ] as const,
   };
 }
 

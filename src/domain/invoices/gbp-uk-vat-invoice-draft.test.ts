@@ -12,10 +12,15 @@ describe("GBP UK VAT invoice draft", () => {
   it("copies UK VAT defaults and builds an exact candidate without consuming a number", () => {
     const draft = {
       ...createUkTaxableInvoiceDraft(completeGbpVatClient),
-      billableDays: "4",
       issueDate: "2026-09-06",
-      periodEnd: "2026-09-05",
-      periodStart: "2026-09-02",
+      serviceLines: [
+        {
+          ...createUkTaxableInvoiceDraft(completeGbpVatClient).serviceLines[0],
+          billableDays: "4",
+          periodEnd: "2026-09-05",
+          periodStart: "2026-09-02",
+        },
+      ] as const,
       taxPoint: "2026-09-05",
     };
 
@@ -28,7 +33,7 @@ describe("GBP UK VAT invoice draft", () => {
 
     expect(draft).toMatchObject({
       taxPoint: "2026-09-05",
-      vatRate: "20",
+      serviceLines: [{ vatRate: "20" }],
       vatTreatment: "uk-taxable",
     });
     expect(review).toMatchObject({
@@ -39,7 +44,6 @@ describe("GBP UK VAT invoice draft", () => {
           kind: "gbp-uk-vat",
           vatTreatment: {
             kind: "uk-taxable",
-            rate: "20",
             taxPoint: "2026-09-05",
             wording: "UK VAT applies.",
           },
@@ -52,8 +56,8 @@ describe("GBP UK VAT invoice draft", () => {
         vat: "GBP 580.00",
       },
       preview: {
+        serviceLines: [{ vatRate: "20" }],
         taxPoint: "2026-09-05",
-        vatRate: "20",
         vatWording: "UK VAT applies.",
       },
     });
@@ -70,7 +74,7 @@ describe("GBP UK VAT invoice draft", () => {
       "tax point before service completion",
       { taxPoint: "2026-09-01" },
       "taxPoint",
-      "cannot precede the period end",
+      "cannot precede the latest period end",
     ],
     [
       "tax point after issue",
@@ -79,23 +83,38 @@ describe("GBP UK VAT invoice draft", () => {
       "cannot follow the issue date",
     ],
   ] as const)("rejects %s", (_name, changedFields, fieldName, message) => {
+    const baseDraft = createUkTaxableInvoiceDraft(completeGbpVatClient);
+    const vatRate = "vatRate" in changedFields ? changedFields.vatRate : "20";
+    const invoiceChanges = "taxPoint" in changedFields ? changedFields : {};
     const review = reviewInvoiceDraft({
       client: completeGbpVatClient,
       draft: {
-        ...createUkTaxableInvoiceDraft(completeGbpVatClient),
-        billableDays: "1",
+        ...baseDraft,
         issueDate: "2026-09-06",
-        periodEnd: "2026-09-05",
-        periodStart: "2026-09-05",
+        serviceLines: [
+          {
+            ...baseDraft.serviceLines[0],
+            billableDays: "1",
+            periodEnd: "2026-09-05",
+            periodStart: "2026-09-05",
+            vatRate,
+          },
+        ],
         taxPoint: "2026-09-05",
-        ...changedFields,
+        ...invoiceChanges,
       },
       issuer: completeIssuer,
       today,
     });
 
     expect(review.candidate).toBeNull();
-    expect(review.errors).toContainEqual({ fieldName, message: expect.stringContaining(message) });
+    expect(review.errors).toContainEqual({
+      location:
+        fieldName === "vatRate"
+          ? { fieldName, kind: "service-line", serviceLineIndex: 0 }
+          : { fieldName, kind: "invoice" },
+      message: expect.stringContaining(message),
+    });
   });
 
   it("requires complete exchange evidence for a foreign-currency UK VAT draft", () => {
@@ -107,10 +126,15 @@ describe("GBP UK VAT invoice draft", () => {
       client: foreignCurrencyClient,
       draft: {
         ...createUkTaxableInvoiceDraft(foreignCurrencyClient),
-        billableDays: "1",
         issueDate: "2026-09-06",
-        periodEnd: "2026-09-05",
-        periodStart: "2026-09-05",
+        serviceLines: [
+          {
+            ...createUkTaxableInvoiceDraft(foreignCurrencyClient).serviceLines[0],
+            billableDays: "1",
+            periodEnd: "2026-09-05",
+            periodStart: "2026-09-05",
+          },
+        ],
         taxPoint: "2026-09-05",
       },
       issuer: completeIssuer,
@@ -120,9 +144,12 @@ describe("GBP UK VAT invoice draft", () => {
     expect(review.candidate).toBeNull();
     expect(review.errors).toEqual(
       expect.arrayContaining([
-        { fieldName: "exchangeRate", message: "Enter a positive exchange rate." },
         {
-          fieldName: "exchangeEvidenceReference",
+          location: { fieldName: "exchangeRate", kind: "invoice" },
+          message: "Enter a positive exchange rate.",
+        },
+        {
+          location: { fieldName: "exchangeEvidenceReference", kind: "invoice" },
           message: "Enter an exchange-rate evidence reference.",
         },
       ]),
