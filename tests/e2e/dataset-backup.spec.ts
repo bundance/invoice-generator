@@ -71,7 +71,7 @@ test("Settings validates, cancels, and completes a whole-dataset restore before 
     await targetPage.getByRole("button", { name: "Restore backup" }).click();
     let dialog = targetPage.getByRole("dialog", { name: "Replace the complete dataset?" });
     await expect(dialog).toContainText("Archive schema 1");
-    await expect(dialog).toContainText("Workspace schema 6");
+    await expect(dialog).toContainText("Workspace schema 7");
     await expect(dialog).toContainText("1 client");
     await expect(dialog).toContainText("1 invoice");
     await expect(dialog).toContainText("GGIOHK-0043.pdf");

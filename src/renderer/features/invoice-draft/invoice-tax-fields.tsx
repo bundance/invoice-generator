@@ -26,14 +26,6 @@ export function InvoiceTaxFields({
       {isUkTaxable ? (
         <>
           <FormField
-            error={errorFor("vatRate")}
-            idPrefix="draft"
-            label="VAT rate"
-            registration={draftForm.register("vatRate", {
-              onBlur: () => onFieldBlur("vatRate"),
-            })}
-          />
-          <FormField
             error={errorFor("taxPoint")}
             idPrefix="draft"
             label="Tax point"

@@ -26,14 +26,19 @@ describe("full credit note", () => {
     });
 
     expect(creditNote).toMatchObject({
-      billableDays: "-4",
       client: completeIssuedInvoice.client,
       currency: completeIssuedInvoice.currency,
-      dayRate: completeIssuedInvoice.dayRate,
       id: "CN-GGIOHK-0043",
       originalInvoiceId: "GGIOHK-0043",
       originalIssueDate: "2026-09-04",
       reason: "The billed service period was incorrect.",
+      serviceLines: [
+        {
+          billableDays: "-4",
+          dayRate: completeIssuedInvoice.serviceLines[0]?.dayRate,
+          totals: { gross: "-2900.00", net: "-2900.00", vat: "0.00" },
+        },
+      ],
       taxFacts: completeIssuedInvoice.taxFacts,
       totals: { gross: "-2900.00", net: "-2900.00", vat: "0.00" },
     });
@@ -72,7 +77,13 @@ describe("full credit note", () => {
     const jpyInvoice = persistedIssuedInvoiceSchema.parse({
       ...completeIssuedInvoice,
       currency: { code: "JPY", minorUnit: 0, name: "Yen" },
-      dayRate: "725",
+      serviceLines: [
+        {
+          ...completeIssuedInvoice.serviceLines[0],
+          dayRate: "725",
+          totals: { gross: "2900", net: "2900", vat: "0" },
+        },
+      ],
       totals: { gross: "2900", net: "2900", vat: "0" },
     });
 
@@ -95,8 +106,14 @@ describe("full credit note", () => {
   it("credits non-zero client-currency totals below one unit", () => {
     const smallInvoice = persistedIssuedInvoiceSchema.parse({
       ...completeIssuedInvoice,
-      billableDays: "0.25",
-      dayRate: "0.04",
+      serviceLines: [
+        {
+          ...completeIssuedInvoice.serviceLines[0],
+          billableDays: "0.25",
+          dayRate: "0.04",
+          totals: { gross: "0.01", net: "0.01", vat: "0.00" },
+        },
+      ],
       totals: { gross: "0.01", net: "0.01", vat: "0.00" },
     });
 
@@ -119,9 +136,15 @@ describe("full credit note", () => {
   it("credits non-zero sterling VAT totals below one pound", () => {
     const smallForeignCurrencyInvoice = persistedIssuedInvoiceSchema.parse({
       ...completeForeignCurrencyVatIssuedInvoice,
-      billableDays: "0.25",
       currency: { code: "JPY", minorUnit: 0, name: "Yen" },
-      dayRate: "3",
+      serviceLines: [
+        {
+          ...completeForeignCurrencyVatIssuedInvoice.serviceLines[0],
+          billableDays: "0.25",
+          dayRate: "3",
+          totals: { gross: "1", net: "1", vat: "0" },
+        },
+      ],
       taxFacts: {
         ...completeForeignCurrencyVatIssuedInvoice.taxFacts,
         sterlingVatSummary: {
@@ -131,6 +154,13 @@ describe("full credit note", () => {
             method: "hmrc-period-rate",
             rate: "3",
           },
+          totalsByRate: [
+            {
+              clientCurrencyNet: "1",
+              sterlingTotals: { gross: "0.40", net: "0.33", vat: "0.07" },
+              vatRate: "20",
+            },
+          ],
           totals: { gross: "0.40", net: "0.33", vat: "0.07" },
         },
       },

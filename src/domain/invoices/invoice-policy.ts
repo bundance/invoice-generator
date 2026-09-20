@@ -1,7 +1,6 @@
 import {
   addDecimalAmounts,
   calculatePercentageAndRoundDecimal,
-  divideAndRoundDecimal,
   fractionalDigitCount,
   multiplyAndRoundDecimal,
   normalizePositiveDecimal,
@@ -38,23 +37,7 @@ export function calculateInvoiceTotals({
   };
 }
 
-type CalculateSterlingInvoiceTotalsOptions = Readonly<{
-  clientCurrencyNet: string;
-  exchangeRate: string;
-  vatRate: string;
-}>;
-
-export function calculateSterlingInvoiceTotals({
-  clientCurrencyNet,
-  exchangeRate,
-  vatRate,
-}: CalculateSterlingInvoiceTotalsOptions): InvoiceTotals {
-  const net = divideAndRoundDecimal(clientCurrencyNet, exchangeRate, 2);
-  const vat = calculatePercentageAndRoundDecimal(net, vatRate, 2);
-  return { gross: addDecimalAmounts(net, vat, 2), net, vat };
-}
-
-export function isPositiveCanonicalDecimal(value: string): boolean {
+function isPositiveCanonicalDecimal(value: string): boolean {
   const normalized = normalizePositiveDecimal(value);
   return normalized.kind === "valid" && normalized.value === value;
 }

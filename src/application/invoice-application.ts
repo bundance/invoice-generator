@@ -20,7 +20,10 @@ import {
   type InvoiceId,
 } from "../domain/invoices/issued-invoice.js";
 import type { DocumentId, RetainedDocument } from "../domain/invoices/retained-document.js";
-import { createReplacementDraft as copyReplacementDraft } from "../domain/invoices/replacement.js";
+import {
+  createReplacementDraft as copyReplacementDraft,
+  replacementDraftHasValidSource,
+} from "../domain/invoices/replacement.js";
 import type { IssuerSettings } from "../domain/issuer/issuer-settings.js";
 import {
   defaultBusinessTimezone,
@@ -554,7 +557,7 @@ function prepareIssueReview(
   if (workspace.issuedInvoices.some(({ id }) => id === review.candidate?.proposedInvoiceId)) {
     return { kind: "invalid", message: "The next invoice ID is already in use." };
   }
-  if (!replacementDraftIsValid(workspace)) {
+  if (!replacementDraftHasValidSource(workspace)) {
     return { kind: "invalid", message: "The replacement link is no longer valid." };
   }
   return {
@@ -562,20 +565,6 @@ function prepareIssueReview(
     client,
     review: { ...review, candidate: review.candidate },
   };
-}
-
-function replacementDraftIsValid(workspace: WorkspaceState): boolean {
-  if (workspace.draft?.kind !== "replacement") return true;
-  const { source } = workspace.draft;
-  const original = workspace.issuedInvoices.find(({ id }) => id === source);
-  const creditNote = workspace.creditNotes.find(
-    ({ originalInvoiceId }) => originalInvoiceId === source,
-  );
-  return Boolean(
-    original &&
-    creditNote?.originalInvoiceId === original.id &&
-    !workspace.issuedInvoices.some(({ replacesInvoiceId }) => replacesInvoiceId === original.id),
-  );
 }
 
 function keepQueueRunning<Result>(mutation: Promise<Result>): Promise<void> {

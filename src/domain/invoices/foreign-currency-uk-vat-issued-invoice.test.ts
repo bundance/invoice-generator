@@ -128,7 +128,6 @@ function createForeignCurrencyVatInvoice() {
     client,
     draft: {
       ...draft,
-      billableDays: "4",
       exchange: {
         effectiveDate: "2026-09-05",
         evidenceReference: "HMRC monthly exchange rates, September 2026",
@@ -137,8 +136,14 @@ function createForeignCurrencyVatInvoice() {
         rate: "1.25",
       },
       issueDate: "2026-09-06",
-      periodEnd: "2026-09-05",
-      periodStart: "2026-09-02",
+      serviceLines: [
+        {
+          ...draft.serviceLines[0],
+          billableDays: "4",
+          periodEnd: "2026-09-05",
+          periodStart: "2026-09-02",
+        },
+      ],
       taxPoint: "2026-09-05",
     },
     issuer: completeIssuer,

@@ -98,7 +98,10 @@ describe("foreign-currency UK VAT invoice draft", () => {
     const review = reviewForeignCurrencyDraft({ exchangeFields: { [inputName]: value } });
 
     expect(review.candidate).toBeNull();
-    expect(review.errors).toContainEqual({ fieldName, message });
+    expect(review.errors).toContainEqual({
+      location: { fieldName, kind: "invoice" },
+      message,
+    });
   });
 
   it("accepts an HMRC period rate dated within the tax point month", () => {
@@ -115,7 +118,7 @@ describe("foreign-currency UK VAT invoice draft", () => {
 
     expect(review.candidate).toBeNull();
     expect(review.errors).toContainEqual({
-      fieldName: "exchangeRate",
+      location: { fieldName: "exchangeRate", kind: "invoice" },
       message: "Use an exchange rate that produces storable sterling totals.",
     });
   });
@@ -127,7 +130,7 @@ describe("foreign-currency UK VAT invoice draft", () => {
 
     expect(review.candidate).toBeNull();
     expect(review.errors).toContainEqual({
-      fieldName: "exchangeEffectiveDate",
+      location: { fieldName: "exchangeEffectiveDate", kind: "invoice" },
       message: "The HMRC period rate must cover the tax point month.",
     });
   });
@@ -141,7 +144,7 @@ describe("foreign-currency UK VAT invoice draft", () => {
 
       expect(review.candidate).toBeNull();
       expect(review.errors).toContainEqual({
-        fieldName: "exchangeEffectiveDate",
+        location: { fieldName: "exchangeEffectiveDate", kind: "invoice" },
         message: "The exchange-rate date must match the tax point for this method.",
       });
     },
@@ -191,7 +194,6 @@ function reviewForeignCurrencyDraft({
     client,
     draft: {
       ...draft,
-      billableDays,
       exchange: {
         ...draft.exchange,
         effectiveDate: "2026-09-05",
@@ -201,8 +203,15 @@ function reviewForeignCurrencyDraft({
         ...exchangeFields,
       },
       issueDate: "2026-09-06",
-      periodEnd: "2026-09-05",
-      periodStart: "2026-09-02",
+      serviceLines: [
+        {
+          ...draft.serviceLines[0],
+          billableDays,
+          dayRate,
+          periodEnd: "2026-09-05",
+          periodStart: "2026-09-02",
+        },
+      ],
       taxPoint: "2026-09-05",
       ...draftFields,
     },

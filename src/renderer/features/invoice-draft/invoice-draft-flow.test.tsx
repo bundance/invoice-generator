@@ -15,7 +15,7 @@ import {
   reviewInvoiceDraft,
   type InvoiceDraftInput,
 } from "../../../domain/invoices/invoice-draft.ts";
-import { completeClient } from "../../../../tests/fixtures/client.ts";
+import { completeClient, completeGbpVatClient } from "../../../../tests/fixtures/client.ts";
 import { completeIssuedInvoice } from "../../../../tests/fixtures/issued-invoice.ts";
 import { completeIssuer } from "../../../../tests/fixtures/issuer-settings.ts";
 import {
@@ -110,16 +110,74 @@ describe("outside-scope invoice draft", () => {
     expect(
       within(screen.getByLabelText("Invoice preview")).getAllByText("USD 3,625.00"),
     ).not.toHaveLength(0);
+    expect(screen.getByRole("button", { name: /React Native consultancy/ })).toHaveTextContent(
+      "USD 3,625.00",
+    );
 
     await waitFor(() => expect(savedDrafts).not.toHaveLength(0));
     expect(await screen.findByText("Saved on this Mac")).toBeVisible();
     expect(savedDrafts.at(-1)).toMatchObject({
-      billableDays: "5",
       currencyCode: "USD",
-      dayRate: "725",
-      serviceDescription: completeClient.defaultServiceDescription,
+      serviceLines: [
+        {
+          billableDays: "5",
+          dayRate: "725",
+          serviceDescription: completeClient.defaultServiceDescription,
+        },
+      ],
     });
     expect(savedDrafts.at(-1)).not.toHaveProperty("invoiceId");
+  });
+
+  it("adds, duplicates, deletes, and autosaves ordered invoice items", async () => {
+    const savedDrafts: InvoiceDraftInput[] = [];
+    window.invoiceApp = {
+      ...readyDraftBridge(),
+      saveInvoiceDraft: (draft) => {
+        savedDrafts.push(draft);
+        return Promise.resolve({ kind: "saved", draft: persistedInvoiceDraftSchema.parse(draft) });
+      },
+    };
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("tab", { name: "Work" }));
+    expect(screen.getByRole("button", { name: "Delete item 1" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "+ Add item" }));
+
+    expect(screen.getByText("2 items")).toBeVisible();
+    const descriptions = screen.getAllByLabelText("Service description");
+    const secondDescription = descriptions[1];
+    if (!secondDescription) throw new Error("Expected a second service description");
+    await user.clear(secondDescription);
+    await user.type(secondDescription, "Architecture workshop");
+
+    await waitFor(() =>
+      expect(savedDrafts.at(-1)?.serviceLines[1]?.serviceDescription).toBe("Architecture workshop"),
+    );
+    expect(screen.getByRole("button", { name: /2.*Architecture workshop/s })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+
+    const billableDays = screen.getAllByLabelText("Billable days")[1];
+    if (!billableDays) throw new Error("Expected second-item billable days");
+    await user.type(billableDays, "2");
+
+    await user.click(screen.getByRole("button", { name: "Duplicate item" }));
+    expect(screen.getByText("3 items")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Delete item 3" }));
+    expect(screen.getByText("2 items")).toBeVisible();
+
+    await waitFor(() =>
+      expect(savedDrafts.at(-1)?.serviceLines[1]).toMatchObject({
+        billableDays: "2",
+        serviceDescription: "Architecture workshop",
+      }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Delete item 2" }));
+    expect(screen.getByRole("button", { name: "Delete item 1" })).toBeDisabled();
   });
 
   it("keeps unsaved draft edits available and retries the latest input after a write failure", async () => {
@@ -158,7 +216,7 @@ describe("outside-scope invoice draft", () => {
     expect(savedDrafts.at(-1)?.notes).toBe("Keep this local edit and the newer edit");
   });
 
-  it("keeps a recovered draft and its unsaved edits when client defaults change", async () => {
+  it("keeps a recovered draft valid when the client's saved VAT treatment changes", async () => {
     const recoveredDraft = persistedInvoiceDraftSchema.parse({
       ...createInvoiceDraft(completeClient),
       notes: "Recovered notes",
@@ -187,6 +245,7 @@ describe("outside-scope invoice draft", () => {
           client: persistedClientSchema.parse({
             ...completeClient,
             paymentTerms: input.paymentTerms,
+            vatTreatment: completeGbpVatClient.vatTreatment,
           }),
         }),
     };
@@ -206,6 +265,8 @@ describe("outside-scope invoice draft", () => {
 
     await user.click(screen.getByRole("button", { name: "Clients" }));
     await replaceField(user, "Payment terms", "Due on receipt");
+    await user.selectOptions(screen.getByLabelText("VAT treatment"), "uk-taxable");
+    await replaceField(user, "Default VAT rate", "20");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     expect(await screen.findByText("Client saved on this Mac")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Create invoice" }));
@@ -213,6 +274,9 @@ describe("outside-scope invoice draft", () => {
 
     expect(screen.getByLabelText("Notes")).toHaveValue("Recovered notes with local edits");
     expect(screen.getByLabelText("Payment terms")).toHaveValue(completeClient.paymentTerms);
+    await user.click(screen.getByRole("button", { name: "+ Add item" }));
+    expect(screen.getAllByLabelText("Service description")).toHaveLength(2);
+    expect(screen.queryByLabelText("VAT rate")).toBeNull();
   });
 
   it("shows field and summary errors, keeps review available, and treats a late issue date as a warning", async () => {
@@ -229,10 +293,21 @@ describe("outside-scope invoice draft", () => {
     ).not.toHaveLength(0);
     expect(screen.getByRole("button", { name: "Review and issue" })).toBeEnabled();
 
+    await replaceField(user, "Period start", "2026-09-04");
+    await replaceField(user, "Period end", "2026-09-04");
+    await replaceField(user, "Billable days", "1");
+    await user.click(screen.getByRole("tab", { name: "Tax & issue" }));
+    await replaceField(user, "Issue date", "2026-09-04");
+    await user.click(screen.getByRole("tab", { name: "Work" }));
+
     await user.click(screen.getByRole("button", { name: "Review and issue" }));
     const summary = screen.getByRole("alert");
-    expect(summary).toHaveFocus();
-    expect(within(summary).getByText(/Fix \d+ details before issuing/)).toBeVisible();
+    expect(within(summary).getByText(/Fix \d+ detail/)).toBeVisible();
+    expect(screen.getByLabelText("Day rate")).toHaveFocus();
+    expect(screen.getByRole("button", { name: /React Native consultancy/ })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
 
     await replaceField(user, "Period start", "2026-08-01");
     expect(screen.getByLabelText("Period start")).toHaveFocus();
@@ -245,7 +320,7 @@ describe("outside-scope invoice draft", () => {
 
     expect(
       screen.getByText(
-        "The issue date is more than 14 days after the service period. Check the tax point before issue.",
+        "The issue date is more than 14 days after the latest service period. Check the tax point before issue.",
       ),
     ).toBeVisible();
     expect(
@@ -302,7 +377,7 @@ describe("outside-scope invoice draft", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Issue invoice GGIOHK-0043?" });
     expect(within(dialog).getByText("Genesis Global")).toBeVisible();
-    expect(within(dialog).getByText("2026-09-01 to 2026-09-04")).toBeVisible();
+    expect(within(dialog).getByText(/2026-09-01 to 2026-09-04/)).toBeVisible();
     expect(within(dialog).getByText("Net")).toBeVisible();
     expect(within(dialog).getByText("VAT")).toBeVisible();
     expect(within(dialog).getByText("Gross")).toBeVisible();
@@ -350,14 +425,23 @@ describe("outside-scope invoice draft", () => {
     await user.click(screen.getByRole("tab", { name: "Work" }));
     expect(screen.getByLabelText("Day rate")).toBeDisabled();
 
+    const reviewDraft = createInvoiceDraft(completeClient);
+    if (reviewDraft.vatTreatment !== "outside-scope") {
+      throw new Error("Expected outside-scope draft");
+    }
     const review = reviewInvoiceDraft({
       client: completeClient,
       draft: {
-        ...createInvoiceDraft(completeClient),
-        billableDays: "4",
+        ...reviewDraft,
         issueDate: "2026-09-04",
-        periodEnd: "2026-09-04",
-        periodStart: "2026-09-01",
+        serviceLines: [
+          {
+            ...reviewDraft.serviceLines[0],
+            billableDays: "4",
+            periodEnd: "2026-09-04",
+            periodStart: "2026-09-01",
+          },
+        ],
       },
       issuer: completeIssuer,
       today: businessDate,
@@ -371,7 +455,7 @@ describe("outside-scope invoice draft", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Issue invoice GGIOHK-0043?" });
     await user.click(within(dialog).getByRole("button", { name: "Issue GGIOHK-0043" }));
-    await waitFor(() => expect(issuedDraft?.dayRate).toBe("725"));
+    await waitFor(() => expect(issuedDraft?.serviceLines[0]?.dayRate).toBe("725"));
   });
 
   it("drains the latest autosave before review and does not save behind an issue", async () => {
@@ -664,10 +748,11 @@ describe("outside-scope invoice draft", () => {
   });
 
   it("offers resume or discard after restart and clears the recovered draft without saving a replacement", async () => {
+    const baseRecoveredDraft = createInvoiceDraft(completeClient);
     const recoveredDraft = persistedInvoiceDraftSchema.parse({
-      ...createInvoiceDraft(completeClient),
-      billableDays: "3.5",
+      ...baseRecoveredDraft,
       notes: "Recovered notes",
+      serviceLines: [{ ...baseRecoveredDraft.serviceLines[0], billableDays: "3.5" }],
     });
     let discardCount = 0;
     let saveCount = 0;

@@ -73,7 +73,7 @@ describe("dataset archive", () => {
         creditNoteCount: 0,
         issuedInvoiceCount: 1,
         pdfFilenames: ["GGIOHK-0043.pdf"],
-        workspaceSchemaVersion: 6,
+        workspaceSchemaVersion: 7,
       },
     });
     expect((await readFile(archivePath)).byteLength).toBeGreaterThan(pdfBytes.byteLength);
@@ -85,7 +85,7 @@ describe("dataset archive", () => {
         creditNoteCount: 0,
         issuedInvoiceCount: 1,
         pdfFilenames: ["GGIOHK-0043.pdf"],
-        workspaceSchemaVersion: 6,
+        workspaceSchemaVersion: 7,
       },
     });
   });

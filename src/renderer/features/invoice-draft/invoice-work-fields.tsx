@@ -1,58 +1,45 @@
+import type {
+  InvoiceDraftInput,
+  InvoiceDraftReview,
+} from "../../../domain/invoices/invoice-draft.ts";
+import type { InvoiceServiceLineFieldName } from "../../../domain/invoices/invoice-service-line.ts";
 import { FormField } from "../../ui/form-controls.tsx";
+import { InvoiceItemsEditor } from "./invoice-items-editor.tsx";
 import type { InvoiceDraftFieldGroupProps } from "./invoice-draft-field-group.ts";
+import type { InvoiceDraftItems } from "./use-invoice-draft-items.ts";
+
+type InvoiceWorkFieldsProps = InvoiceDraftFieldGroupProps &
+  Readonly<{
+    draft: InvoiceDraftInput;
+    items: InvoiceDraftItems;
+    onServiceLineFieldBlur: (fieldId: string, fieldName: InvoiceServiceLineFieldName) => void;
+    review: InvoiceDraftReview;
+    serviceLineErrorFor: (
+      index: number,
+      fieldId: string,
+      fieldName: InvoiceServiceLineFieldName,
+    ) => string | undefined;
+  }>;
 
 export function InvoiceWorkFields({
+  draft,
   draftForm,
   errorFor,
+  items,
   onFieldBlur,
-}: InvoiceDraftFieldGroupProps) {
+  onServiceLineFieldBlur,
+  review,
+  serviceLineErrorFor,
+}: InvoiceWorkFieldsProps) {
   return (
     <div className="draft-fields">
-      <FormField
-        error={errorFor("serviceDescription")}
-        idPrefix="draft"
-        label="Service description"
-        multiline
-        multilineRows={5}
-        registration={draftForm.register("serviceDescription", {
-          onBlur: () => onFieldBlur("serviceDescription"),
-        })}
-      />
-      <FormField
-        error={errorFor("periodStart")}
-        idPrefix="draft"
-        label="Period start"
-        registration={draftForm.register("periodStart", {
-          onBlur: () => onFieldBlur("periodStart"),
-        })}
-        type="date"
-      />
-      <FormField
-        error={errorFor("periodEnd")}
-        idPrefix="draft"
-        label="Period end"
-        registration={draftForm.register("periodEnd", {
-          onBlur: () => onFieldBlur("periodEnd"),
-        })}
-        type="date"
-      />
-      <FormField
-        error={errorFor("billableDays")}
-        idPrefix="draft"
-        inputMode="decimal"
-        label="Billable days"
-        registration={draftForm.register("billableDays", {
-          onBlur: () => onFieldBlur("billableDays"),
-        })}
-      />
-      <FormField
-        error={errorFor("dayRate")}
-        idPrefix="draft"
-        inputMode="decimal"
-        label="Day rate"
-        registration={draftForm.register("dayRate", {
-          onBlur: () => onFieldBlur("dayRate"),
-        })}
+      <InvoiceItemsEditor
+        draft={draft}
+        draftForm={draftForm}
+        errorFor={serviceLineErrorFor}
+        items={items}
+        onFieldBlur={onServiceLineFieldBlur}
+        review={review}
       />
       <FormField
         error={errorFor("purchaseOrder")}

@@ -32,7 +32,11 @@ describe("replacement application", () => {
       draft: {
         clientId: completeClient.id,
         issueDate: "",
-        serviceDescription: completeIssuedInvoice.serviceDescription,
+        serviceLines: [
+          {
+            serviceDescription: completeIssuedInvoice.serviceLines[0]?.serviceDescription,
+          },
+        ],
       },
       source: completeIssuedInvoice.id,
     });

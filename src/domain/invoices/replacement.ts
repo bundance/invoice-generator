@@ -20,6 +20,23 @@ export type ReplacementDraft = Readonly<{
   source: ReplacementDraftSource;
 }>;
 
+type ReplacementWorkspace = Readonly<{
+  creditNotes: readonly Pick<CreditNote, "originalInvoiceId">[];
+  draft: Readonly<{ kind: "ordinary" }> | Readonly<{ kind: "replacement"; source: string }> | null;
+  issuedInvoices: readonly Pick<IssuedInvoice, "id" | "replacesInvoiceId">[];
+}>;
+
+export function replacementDraftHasValidSource(workspace: ReplacementWorkspace): boolean {
+  if (workspace.draft?.kind !== "replacement") return true;
+  const source = workspace.draft.source;
+  const original = workspace.issuedInvoices.find(({ id }) => id === source);
+  if (!original) return false;
+  return (
+    workspace.creditNotes.some(({ originalInvoiceId }) => originalInvoiceId === original.id) &&
+    !workspace.issuedInvoices.some(({ replacesInvoiceId }) => replacesInvoiceId === original.id)
+  );
+}
+
 export function createReplacementDraft({
   client,
   creditNote,
@@ -31,19 +48,15 @@ export function createReplacementDraft({
 
   return {
     draft: persistedInvoiceDraftSchema.parse({
-      billableDays: invoice.billableDays,
       clientId: client.id,
       clientLegalName: invoice.client.legalName,
       clientPostalAddress: invoice.client.postalAddress,
       currencyCode: invoice.currency.code,
-      dayRate: invoice.dayRate,
       issueDate: "",
       notes: invoice.notes,
       paymentTerms: invoice.paymentTerms,
-      periodEnd: invoice.periodEnd,
-      periodStart: invoice.periodStart,
       purchaseOrder: invoice.purchaseOrder,
-      serviceDescription: invoice.serviceDescription,
+      serviceLines: invoice.serviceLines.map(({ totals: _totals, ...serviceLine }) => serviceLine),
       ...copyTaxFields(invoice),
     }),
     source: replacementDraftSourceSchema.parse(invoice.id),
@@ -66,7 +79,6 @@ function copyTaxFields(invoice: IssuedInvoice) {
         ? { ...taxFacts.sterlingVatSummary.exchangeRecord, kind: "required" as const }
         : { kind: "not-required" as const },
     taxPoint: taxFacts.vatTreatment.taxPoint,
-    vatRate: taxFacts.vatTreatment.rate,
     vatTreatment: "uk-taxable",
   } as const;
 }

@@ -24,12 +24,16 @@ describe("issued outside-scope invoice", () => {
         clientLegalName: "  Genesis Global  ",
         clientPostalAddress: "123 Market Street\nNew York\nNY 10001",
         currencyCode: "USD",
-        serviceDescription: "React Native consultancy",
-        periodStart: "2026-08-01",
-        periodEnd: "2026-08-31",
         issueDate: "2026-09-04",
-        billableDays: "5",
-        dayRate: "725",
+        serviceLines: [
+          {
+            billableDays: "5",
+            dayRate: "725",
+            periodEnd: "2026-08-31",
+            periodStart: "2026-08-01",
+            serviceDescription: "React Native consultancy",
+          },
+        ],
         paymentTerms: "Due within 30 days",
         notes: "Thank you",
         purchaseOrder: "PO-43",
@@ -132,7 +136,17 @@ describe("issued outside-scope invoice", () => {
       { client: { ...completeIssuedInvoice.client, legalName: " Genesis Global " } },
     ],
     ["a control character", { notes: "Invalid\u0000note" }],
-    ["overlong multiline text", { serviceDescription: "x".repeat(1_001) }],
+    [
+      "overlong multiline text",
+      {
+        serviceLines: [
+          {
+            ...completeIssuedInvoice.serviceLines[0],
+            serviceDescription: "x".repeat(10_001),
+          },
+        ],
+      },
+    ],
     ["a mismatched calculated net total", { totals: { net: "1.00", vat: "0.00", gross: "1.00" } }],
     [
       "VAT wording inconsistent with reverse charge",
@@ -149,8 +163,13 @@ describe("issued outside-scope invoice", () => {
     [
       "an unacknowledged late issue date",
       {
-        periodStart: "2026-08-01",
-        periodEnd: "2026-08-01",
+        serviceLines: [
+          {
+            ...completeIssuedInvoice.serviceLines[0],
+            periodStart: "2026-08-01",
+            periodEnd: "2026-08-01",
+          },
+        ],
         issue: {
           ...completeIssuedInvoice.issue,
           date: "2026-09-04",

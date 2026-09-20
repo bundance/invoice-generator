@@ -84,7 +84,7 @@ describe("GBP UK VAT invoice flow", () => {
     expect(preview).toHaveTextContent("GBP 2,900.00");
     expect(preview).toHaveTextContent("GBP 580.00");
     expect(preview).toHaveTextContent("GBP 3,480.00");
-    expect(preview).toHaveTextContent("VAT rate: 20%");
+    expect(preview).toHaveTextContent("20%");
     expect(preview).toHaveTextContent("Tax point: 2026-09-05");
 
     await user.click(screen.getByRole("button", { name: "Review and issue" }));

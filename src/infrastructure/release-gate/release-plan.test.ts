@@ -54,14 +54,14 @@ describe("local release gate", () => {
     expect(pdfStage?.command).toContain("--project=pdf");
     expect(pdfStage?.command).not.toContain("supplied reference invoice");
     expect(pdfStage?.command).toContain("GBP UK VAT invoice");
-    expect(pdfStage?.command).toContain("outside-scope invoice");
+    expect(pdfStage?.command).toContain("multi-item invoice");
     expect(rasterCheck).toMatchObject({
       evidence: {
         kind: "tests",
         titleFragments: [
           "GBP UK VAT invoice keeps exact tax facts",
           "foreign-currency UK VAT invoice retains sterling evidence",
-          "outside-scope invoice issues once",
+          "multi-item invoice recovers, credits, replaces, and retains exact PDFs",
         ],
       },
     });

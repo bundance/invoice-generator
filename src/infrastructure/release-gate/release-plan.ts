@@ -57,7 +57,7 @@ export const releaseStages = [
   },
   {
     command:
-      'timeout 300 env PLAYWRIGHT_JSON_OUTPUT_FILE=test-results/pdf.json playwright test --project=pdf --grep "GBP UK VAT invoice|foreign-currency UK VAT invoice|outside-scope invoice" --reporter=line,json',
+      'timeout 300 env PLAYWRIGHT_JSON_OUTPUT_FILE=test-results/pdf.json playwright test --project=pdf --grep "GBP UK VAT invoice|foreign-currency UK VAT invoice|multi-item invoice" --reporter=line,json',
     id: "pdf",
     name: "PDF verification",
     result: { kind: "playwright", path: "test-results/pdf.json" },
@@ -107,7 +107,7 @@ export const electronScenarioGroups = [
     ["GBP UK VAT invoice keeps exact tax facts"],
   ),
   namedCheck("electron-04-outside-scope", "Outside-scope and reverse-charge issue", "electron", [
-    "outside-scope invoice issues once",
+    "multi-item invoice recovers, credits, replaces, and retains exact PDFs",
   ]),
   namedCheck(
     "electron-05-foreign-currency-vat",
@@ -122,7 +122,7 @@ export const electronScenarioGroups = [
     "electron-07-correction-chain",
     "Full credit and repeated replacement chain",
     "electron",
-    ["outside-scope invoice issues once"],
+    ["multi-item invoice recovers, credits, replaces, and retains exact PDFs"],
   ),
   namedCheck(
     "electron-08-backup-and-recovery",
@@ -193,7 +193,10 @@ export const automatedChecks = [
     "pdf-structure-and-fit",
     "PDF structure, A4 fit, selectable text, fonts, and wordmark",
     "pdf",
-    ["GBP UK VAT invoice keeps exact tax facts", "outside-scope invoice issues once"],
+    [
+      "GBP UK VAT invoice keeps exact tax facts",
+      "multi-item invoice recovers, credits, replaces, and retains exact PDFs",
+    ],
   ),
   namedCheck(
     "pdf-raster-fidelity",
@@ -202,7 +205,7 @@ export const automatedChecks = [
     [
       "GBP UK VAT invoice keeps exact tax facts",
       "foreign-currency UK VAT invoice retains sterling evidence",
-      "outside-scope invoice issues once",
+      "multi-item invoice recovers, credits, replaces, and retains exact PDFs",
     ],
   ),
   namedCheck(

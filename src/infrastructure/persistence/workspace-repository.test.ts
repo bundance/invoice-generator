@@ -43,7 +43,7 @@ describe("workspace repository", () => {
   it.each([
     ["malformed", "not JSON"],
     ["invalid-schema", JSON.stringify({ schemaVersion: 6, clients: [] })],
-    ["newer-version", JSON.stringify({ ...initialWorkspaceState, schemaVersion: 7 })],
+    ["newer-version", JSON.stringify({ ...initialWorkspaceState, schemaVersion: 8 })],
     [
       "inconsistent",
       JSON.stringify({

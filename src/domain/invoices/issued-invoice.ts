@@ -2,8 +2,7 @@ import { z } from "zod";
 
 import { clientIdSchema } from "../clients/client.ts";
 import { persistedIssuerSettingsSchema } from "../issuer/issuer-settings.ts";
-import { normalizePositiveDecimal } from "../money/decimal.ts";
-import { normalizeVatRate } from "../tax/vat-rate.ts";
+import { addDecimalAmounts } from "../money/decimal.ts";
 import {
   createFieldSchemas,
   normalizeOptionalMultiline,
@@ -17,11 +16,14 @@ import {
   amountFitsCurrencyPrecision,
   billableDaysExceedInvoicePeriod,
   calculateInvoiceTotals,
-  isPositiveCanonicalDecimal,
   isPositiveQuarterDayAmount,
   issueDateRequiresAcknowledgement,
-  type InvoiceTotalTreatment,
 } from "./invoice-policy.ts";
+import {
+  persistedInvoiceServiceLineSchema,
+  type NonEmptyReadonlyArray,
+  type ReviewedTaxableInvoiceServiceLine,
+} from "./invoice-service-line.ts";
 import { persistedInvoiceTaxFactsSchema } from "./invoice-tax-facts.ts";
 
 const invoiceIdSchema = z
@@ -39,12 +41,6 @@ const canonicalDecimalSchema = z
   .string()
   .max(200)
   .regex(/^(?:0|[1-9]\d*)(?:\.\d+)?$/u);
-const positiveCanonicalDecimalSchema = canonicalDecimalSchema.superRefine((value, context) => {
-  const normalized = normalizePositiveDecimal(value);
-  if (normalized.kind === "invalid" || normalized.value !== value) {
-    context.addIssue({ code: "custom", message: "Use a canonical positive decimal." });
-  }
-});
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/u);
 const requiredSingleLineSchema = createFieldSchemas<"IssuedRequiredSingleLine">((value) =>
   normalizeRequiredSingleLine(value, "Enter a required invoice value."),
@@ -77,11 +73,7 @@ const issuedInvoiceSnapshotFields = {
     })
     .readonly(),
   currency: historicalCurrencySchema,
-  serviceDescription: requiredMultilineSchema,
-  periodStart: calendarDateSchema,
-  periodEnd: calendarDateSchema,
-  billableDays: positiveCanonicalDecimalSchema,
-  dayRate: positiveCanonicalDecimalSchema,
+  serviceLines: z.array(persistedInvoiceServiceLineSchema).min(1).readonly(),
   paymentTerms: requiredSingleLineSchema,
   notes: optionalMultilineSchema,
   purchaseOrder: optionalSingleLineSchema,
@@ -162,11 +154,7 @@ export function createIssuedInvoiceSnapshot({
     replacesInvoiceId,
     client: candidate.client,
     currency: candidate.currency,
-    serviceDescription: candidate.serviceDescription,
-    periodStart: candidate.periodStart,
-    periodEnd: candidate.periodEnd,
-    billableDays: candidate.billableDays,
-    dayRate: candidate.dayRate,
+    serviceLines: candidate.serviceLines,
     paymentTerms: candidate.paymentTerms,
     notes: candidate.notes,
     purchaseOrder: candidate.purchaseOrder,
@@ -209,8 +197,7 @@ function checkInvoiceFacts(invoice: InvoiceFacts, context: RefinementContext): v
 
 function checkCoreInvoiceFacts(invoice: InvoiceFacts, context: RefinementContext): void {
   checkInvoiceIdentity(invoice, context);
-  checkInvoiceQuantityAndRate(invoice, context);
-  checkInvoiceDates(invoice, context);
+  checkInvoiceServiceLines(invoice, context);
   checkInvoiceTotals(invoice, context);
   checkInvoiceTaxTreatment(invoice, context);
   checkInvoiceIssueEvent(invoice, context);
@@ -256,66 +243,93 @@ function checkInvoiceIdentity(invoice: InvoiceFacts, context: RefinementContext)
   }
 }
 
-function checkInvoiceQuantityAndRate(invoice: InvoiceFacts, context: RefinementContext): void {
-  if (!isPositiveQuarterDayAmount(invoice.billableDays)) {
-    context.addIssue({
-      code: "custom",
-      message: "Billable days must be positive quarter-day increments.",
-      path: ["billableDays"],
-    });
-  }
-  if (!isPositiveCanonicalDecimal(invoice.dayRate)) {
-    context.addIssue({
-      code: "custom",
-      message: "The day rate must be greater than zero.",
-      path: ["dayRate"],
-    });
-  }
-  if (!amountFitsCurrencyPrecision(invoice.dayRate, invoice.currency.minorUnit)) {
-    context.addIssue({
-      code: "custom",
-      message: "The day rate exceeds the historical currency precision.",
-      path: ["dayRate"],
-    });
+function checkInvoiceServiceLines(invoice: InvoiceFacts, context: RefinementContext): void {
+  for (const [index, serviceLine] of invoice.serviceLines.entries()) {
+    checkInvoiceServiceLine(invoice, serviceLine, index, context);
   }
 }
 
-function checkInvoiceDates(invoice: InvoiceFacts, context: RefinementContext): void {
-  if (invoice.periodStart > invoice.periodEnd || invoice.periodEnd > invoice.issue.date) {
-    context.addIssue({
-      code: "custom",
-      message: "The immutable invoice dates are out of order.",
-      path: ["issue", "date"],
-    });
+function checkInvoiceServiceLine(
+  invoice: InvoiceFacts,
+  serviceLine: InvoiceFacts["serviceLines"][number],
+  index: number,
+  context: RefinementContext,
+): void {
+  if (!isPositiveQuarterDayAmount(serviceLine.billableDays)) {
+    addLineIssue(
+      context,
+      index,
+      "billableDays",
+      "Billable days must be positive quarter-day increments.",
+    );
+  }
+  if (!amountFitsCurrencyPrecision(serviceLine.dayRate, invoice.currency.minorUnit)) {
+    addLineIssue(
+      context,
+      index,
+      "dayRate",
+      "The day rate exceeds the historical currency precision.",
+    );
+  }
+  const datesAreOutOfOrder =
+    serviceLine.periodStart > serviceLine.periodEnd || serviceLine.periodEnd > invoice.issue.date;
+  if (datesAreOutOfOrder) {
+    addLineIssue(context, index, "periodEnd", "The immutable service-line dates are out of order.");
   }
   if (
-    isRealCalendarDate(invoice.periodStart) &&
-    isRealCalendarDate(invoice.periodEnd) &&
-    billableDaysExceedInvoicePeriod(invoice.billableDays, invoice.periodStart, invoice.periodEnd)
+    billableDaysExceedInvoicePeriod(
+      serviceLine.billableDays,
+      serviceLine.periodStart,
+      serviceLine.periodEnd,
+    )
   ) {
-    context.addIssue({
-      code: "custom",
-      message: "Billable days exceed the immutable service period.",
-      path: ["billableDays"],
-    });
+    addLineIssue(
+      context,
+      index,
+      "billableDays",
+      "Billable days exceed the immutable service period.",
+    );
+  }
+  checkInvoiceServiceLineTotals(invoice, serviceLine, index, context);
+}
+
+function checkInvoiceServiceLineTotals(
+  invoice: InvoiceFacts,
+  serviceLine: InvoiceFacts["serviceLines"][number],
+  index: number,
+  context: RefinementContext,
+): void {
+  const expectedTotals = calculateInvoiceTotals({
+    billableDays: serviceLine.billableDays,
+    dayRate: serviceLine.dayRate,
+    minorUnit: invoice.currency.minorUnit,
+    treatment:
+      "vatRate" in serviceLine
+        ? { kind: "uk-taxable", rate: serviceLine.vatRate }
+        : { kind: "outside-scope" },
+  });
+  for (const totalName of ["net", "vat", "gross"] as const) {
+    if (serviceLine.totals[totalName] === expectedTotals[totalName]) continue;
+    addLineIssue(
+      context,
+      index,
+      "totals",
+      `The immutable ${totalName} total does not match the service-line calculation.`,
+    );
   }
 }
 
 function checkInvoiceTotals(invoice: InvoiceFacts, context: RefinementContext): void {
-  if (
-    !isPositiveCanonicalDecimal(invoice.billableDays) ||
-    !isPositiveCanonicalDecimal(invoice.dayRate)
-  ) {
-    return;
-  }
-  const treatment = invoiceTotalTreatment(invoice);
-  if (!treatment) return;
-  const expectedTotals = calculateInvoiceTotals({
-    billableDays: invoice.billableDays,
-    dayRate: invoice.dayRate,
-    minorUnit: invoice.currency.minorUnit,
-    treatment,
-  });
+  const zero =
+    invoice.currency.minorUnit === 0 ? "0" : `0.${"0".repeat(invoice.currency.minorUnit)}`;
+  const expectedTotals = invoice.serviceLines.reduce(
+    (totals, serviceLine) => ({
+      gross: addDecimalAmounts(totals.gross, serviceLine.totals.gross, invoice.currency.minorUnit),
+      net: addDecimalAmounts(totals.net, serviceLine.totals.net, invoice.currency.minorUnit),
+      vat: addDecimalAmounts(totals.vat, serviceLine.totals.vat, invoice.currency.minorUnit),
+    }),
+    { gross: zero, net: zero, vat: zero },
+  );
   for (const totalName of ["net", "vat", "gross"] as const) {
     if (invoice.totals[totalName] !== expectedTotals[totalName]) {
       context.addIssue({
@@ -327,37 +341,29 @@ function checkInvoiceTotals(invoice: InvoiceFacts, context: RefinementContext): 
   }
 }
 
-function invoiceTotalTreatment(invoice: InvoiceFacts): InvoiceTotalTreatment | null {
-  const vatTreatment = invoice.taxFacts.vatTreatment;
-  if (vatTreatment.kind === "outside-scope") return { kind: "outside-scope" };
-  const rate = normalizeVatRate(vatTreatment.rate);
-  return rate.kind === "valid" && rate.value === vatTreatment.rate
-    ? { kind: "uk-taxable", rate: rate.value }
-    : null;
-}
-
 function checkInvoiceTaxTreatment(invoice: InvoiceFacts, context: RefinementContext): void {
   const { taxFacts } = invoice;
-  if (taxFacts.kind === "outside-scope") return;
-  if (
-    taxFacts.kind === "gbp-uk-vat" &&
-    (invoice.currency.code !== "GBP" || invoice.currency.minorUnit !== 2)
-  ) {
+  const taxableLines = invoice.serviceLines.filter(isTaxableServiceLine);
+  if (taxFacts.kind === "outside-scope") {
+    if (taxableLines.length > 0) {
+      context.addIssue({
+        code: "custom",
+        message: "Outside-scope invoice lines cannot carry VAT rates.",
+        path: ["serviceLines"],
+      });
+    }
+    return;
+  }
+  if (taxableLines.length !== invoice.serviceLines.length) {
     context.addIssue({
       code: "custom",
-      message: "GBP VAT facts require GBP with two minor-unit digits.",
-      path: ["currency"],
+      message: "UK-taxable invoice lines must each carry a VAT rate.",
+      path: ["serviceLines"],
     });
   }
-  if (taxFacts.kind === "foreign-currency-uk-vat" && invoice.currency.code === "GBP") {
-    context.addIssue({
-      code: "custom",
-      message: "Foreign-currency VAT facts cannot use GBP.",
-      path: ["currency"],
-    });
-  }
+  checkInvoiceVatCurrency(invoice, context);
   if (
-    taxFacts.vatTreatment.taxPoint < invoice.periodEnd ||
+    taxFacts.vatTreatment.taxPoint < latestPeriodEnd(invoice) ||
     taxFacts.vatTreatment.taxPoint > invoice.issue.date
   ) {
     context.addIssue({
@@ -368,14 +374,34 @@ function checkInvoiceTaxTreatment(invoice: InvoiceFacts, context: RefinementCont
   }
 }
 
+function checkInvoiceVatCurrency(invoice: InvoiceFacts, context: RefinementContext): void {
+  const { taxFacts } = invoice;
+  const invalidGbpFacts =
+    taxFacts.kind === "gbp-uk-vat" &&
+    (invoice.currency.code !== "GBP" || invoice.currency.minorUnit !== 2);
+  const invalidForeignFacts =
+    taxFacts.kind === "foreign-currency-uk-vat" && invoice.currency.code === "GBP";
+  if (!invalidGbpFacts && !invalidForeignFacts) return;
+  context.addIssue({
+    code: "custom",
+    message: invalidGbpFacts
+      ? "GBP VAT facts require GBP with two minor-unit digits."
+      : "Foreign-currency VAT facts cannot use GBP.",
+    path: ["currency"],
+  });
+}
+
 function checkSterlingVatSummary(invoice: InvoiceFacts, context: RefinementContext): void {
   if (invoice.taxFacts.kind !== "foreign-currency-uk-vat") return;
 
+  const serviceLines = asTaxableNonEmpty(invoice.serviceLines);
+  if (!serviceLines) return;
+
   const errors = sterlingVatSummaryErrors({
-    clientCurrencyNet: invoice.totals.net,
+    clientCurrencyMinorUnit: invoice.currency.minorUnit,
+    serviceLines,
     summary: invoice.taxFacts.sterlingVatSummary,
     taxPoint: invoice.taxFacts.vatTreatment.taxPoint,
-    vatRate: invoice.taxFacts.vatTreatment.rate,
   });
   for (const error of errors) {
     context.addIssue({
@@ -395,9 +421,9 @@ function checkInvoiceIssueEvent(invoice: InvoiceFacts, context: RefinementContex
     });
   }
   if (
-    isRealCalendarDate(invoice.periodEnd) &&
+    isRealCalendarDate(latestPeriodEnd(invoice)) &&
     isRealCalendarDate(invoice.issue.date) &&
-    issueDateRequiresAcknowledgement(invoice.periodEnd, invoice.issue.date) &&
+    issueDateRequiresAcknowledgement(latestPeriodEnd(invoice), invoice.issue.date) &&
     !invoice.issue.lateIssueDateAcknowledged
   ) {
     context.addIssue({
@@ -406,6 +432,36 @@ function checkInvoiceIssueEvent(invoice: InvoiceFacts, context: RefinementContex
       path: ["issue", "lateIssueDateAcknowledged"],
     });
   }
+}
+
+function latestPeriodEnd(invoice: InvoiceFacts): string {
+  return invoice.serviceLines.reduce(
+    (latest, line) => (line.periodEnd > latest ? line.periodEnd : latest),
+    invoice.serviceLines[0]?.periodEnd ?? "",
+  );
+}
+
+function isTaxableServiceLine(
+  serviceLine: InvoiceFacts["serviceLines"][number],
+): serviceLine is Extract<InvoiceFacts["serviceLines"][number], { vatRate: string }> {
+  return "vatRate" in serviceLine;
+}
+
+function asTaxableNonEmpty(
+  serviceLines: InvoiceFacts["serviceLines"],
+): NonEmptyReadonlyArray<ReviewedTaxableInvoiceServiceLine> | null {
+  if (!serviceLines.every(isTaxableServiceLine)) return null;
+  const [first, ...rest] = serviceLines;
+  return first ? [{ ...first }, ...rest.map((serviceLine) => ({ ...serviceLine }))] : null;
+}
+
+function addLineIssue(
+  context: RefinementContext,
+  index: number,
+  field: string,
+  message: string,
+): void {
+  context.addIssue({ code: "custom", message, path: ["serviceLines", index, field] });
 }
 
 function isRealCalendarDate(value: string): boolean {

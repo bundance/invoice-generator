@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { normalizeVatRate } from "../tax/vat-rate.ts";
 import {
   outsideScopeVatWording,
   outsideScopeWording,
@@ -10,7 +9,6 @@ import {
 import { createFieldSchemas, normalizeRequiredMultiline } from "../validation/text-field.ts";
 
 const calendarDateSchema = z.iso.date();
-const invoiceVatRateSchema = createFieldSchemas<"InvoiceVatRate">(normalizeVatRate).persisted;
 const requiredEvidenceSchema = createFieldSchemas<"InvoiceOutsideScopeEvidence">((value) =>
   normalizeRequiredMultiline(value, "Enter an outside-scope evidence reference."),
 ).persisted;
@@ -18,7 +16,6 @@ const requiredEvidenceSchema = createFieldSchemas<"InvoiceOutsideScopeEvidence">
 export const persistedUkTaxableVatTreatmentSchema = z
   .strictObject({
     kind: z.literal("uk-taxable"),
-    rate: invoiceVatRateSchema,
     taxPoint: calendarDateSchema,
     wording: z.literal(ukTaxableWording),
   })

@@ -69,7 +69,7 @@ A new issued invoice that corrects a fully credited invoice. It has its own invo
 _Avoid_: Revised invoice, edited invoice
 
 **Service line**:
-The single entry on an invoice that describes the work, its quantity, and the client's standard rate.
+One entry in an invoice's non-empty ordered collection of work. Each service line owns its description, inclusive period, billable days, day rate, calculated amounts, and VAT rate when the invoice is UK taxable. Net and VAT round per service line before invoice totals are summed.
 _Avoid_: Line item, charge row
 
 **Billable day**:
@@ -101,7 +101,7 @@ The issuer's current statutory UK VAT percentage for new UK-taxable invoices.
 _Avoid_: Current VAT, client VAT rate
 
 **VAT treatment**:
-The tax classification selected for a supply: UK taxable with a positive VAT rate, or outside the scope of UK VAT with no numeric VAT rate.
+The invoice-wide tax classification selected for its supplies: UK taxable, with a positive VAT rate on every service line, or outside the scope of UK VAT, with no numeric VAT rate on any service line.
 _Avoid_: VAT rate, VAT status
 
 **Reverse charge**:

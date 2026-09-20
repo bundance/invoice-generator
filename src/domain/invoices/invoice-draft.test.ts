@@ -11,12 +11,17 @@ const businessDate = parseBusinessDate("2026-09-04");
 describe("outside-scope invoice draft", () => {
   it("copies editable client defaults and calculates exact half-up totals without using a number", () => {
     const draft = {
-      ...createInvoiceDraft(completeClient),
-      billableDays: "0.25",
-      dayRate: "0.02",
+      ...createOutsideScopeDraft(completeClient),
       issueDate: "2026-09-04",
-      periodEnd: "2026-09-04",
-      periodStart: "2026-09-04",
+      serviceLines: [
+        {
+          ...createOutsideScopeDraft(completeClient).serviceLines[0],
+          billableDays: "0.25",
+          dayRate: "0.02",
+          periodEnd: "2026-09-04",
+          periodStart: "2026-09-04",
+        },
+      ] as const,
     };
 
     const review = reviewInvoiceDraft({
@@ -30,9 +35,13 @@ describe("outside-scope invoice draft", () => {
       clientId: completeClient.id,
       clientLegalName: completeClient.legalName,
       currencyCode: "USD",
-      dayRate: "0.02",
       outsideScopeEvidenceReference: "Contract and tax certificate",
-      serviceDescription: completeClient.defaultServiceDescription,
+      serviceLines: [
+        {
+          dayRate: "0.02",
+          serviceDescription: completeClient.defaultServiceDescription,
+        },
+      ],
     });
     expect(review).toMatchObject({
       candidate: {
@@ -76,11 +85,16 @@ describe("outside-scope invoice draft", () => {
       const review = reviewInvoiceDraft({
         client,
         draft: {
-          ...createInvoiceDraft(client),
-          billableDays: "0.25",
+          ...createOutsideScopeDraft(client),
           issueDate: "2026-09-04",
-          periodEnd: "2026-09-04",
-          periodStart: "2026-09-04",
+          serviceLines: [
+            {
+              ...createOutsideScopeDraft(client).serviceLines[0],
+              billableDays: "0.25",
+              periodEnd: "2026-09-04",
+              periodStart: "2026-09-04",
+            },
+          ],
         },
         issuer: completeIssuer,
         today: businessDate,
@@ -94,12 +108,17 @@ describe("outside-scope invoice draft", () => {
     const review = reviewInvoiceDraft({
       client: completeClient,
       draft: {
-        ...createInvoiceDraft(completeClient),
-        billableDays: "1.2",
-        dayRate: "not-a-rate",
+        ...createOutsideScopeDraft(completeClient),
         issueDate: "2026-09-05",
-        periodEnd: "2026-09-03",
-        periodStart: "2026-09-04",
+        serviceLines: [
+          {
+            ...createOutsideScopeDraft(completeClient).serviceLines[0],
+            billableDays: "1.2",
+            dayRate: "not-a-rate",
+            periodEnd: "2026-09-03",
+            periodStart: "2026-09-04",
+          },
+        ],
       },
       issuer: completeIssuer,
       today: businessDate,
@@ -109,10 +128,22 @@ describe("outside-scope invoice draft", () => {
     expect(review.formattedTotals).toBeNull();
     expect(review.errors).toEqual(
       expect.arrayContaining([
-        { fieldName: "billableDays", message: "Use quarter-day increments." },
-        { fieldName: "dayRate", message: "Enter a positive amount." },
-        { fieldName: "periodEnd", message: "The period end cannot precede its start." },
-        { fieldName: "issueDate", message: "The issue date cannot be in the future." },
+        {
+          location: { kind: "service-line", serviceLineIndex: 0, fieldName: "billableDays" },
+          message: "Use quarter-day increments.",
+        },
+        {
+          location: { kind: "service-line", serviceLineIndex: 0, fieldName: "dayRate" },
+          message: "Enter a positive amount.",
+        },
+        {
+          location: { kind: "service-line", serviceLineIndex: 0, fieldName: "periodEnd" },
+          message: "The period end cannot precede its start.",
+        },
+        {
+          location: { kind: "invoice", fieldName: "issueDate" },
+          message: "The issue date cannot be in the future.",
+        },
       ]),
     );
   });
@@ -121,13 +152,18 @@ describe("outside-scope invoice draft", () => {
     const review = reviewInvoiceDraft({
       client: completeClient,
       draft: {
-        ...createInvoiceDraft(completeClient),
-        billableDays: "1.00",
+        ...createOutsideScopeDraft(completeClient),
         clientLegalName: "  Genesis   Global  ",
         issueDate: "2026-09-04",
         notes: "  First line\r\nSecond line  ",
-        periodEnd: "2026-08-01",
-        periodStart: "2026-08-01",
+        serviceLines: [
+          {
+            ...createOutsideScopeDraft(completeClient).serviceLines[0],
+            billableDays: "1.00",
+            periodEnd: "2026-08-01",
+            periodStart: "2026-08-01",
+          },
+        ],
         purchaseOrder: "  PO   42  ",
       },
       issuer: completeIssuer,
@@ -135,23 +171,21 @@ describe("outside-scope invoice draft", () => {
     });
 
     expect(review.candidate).toMatchObject({
-      billableDays: "1",
       client: { legalName: "Genesis Global" },
       notes: "First line\nSecond line",
       purchaseOrder: "PO 42",
     });
     expect(review.preview).toMatchObject({
-      billableDays: "1",
       clientLegalName: "Genesis Global",
-      formattedDayRate: "USD 725.00",
       notes: "First line\nSecond line",
       purchaseOrder: "PO 42",
+      serviceLines: [{ billableDays: "1", formattedDayRate: "USD 725.00" }],
     });
     expect(review.warnings).toEqual([
       {
         kind: "late-issue-date",
         message:
-          "The issue date is more than 14 days after the service period. Check the tax point before issue.",
+          "The issue date is more than 14 days after the latest service period. Check the tax point before issue.",
       },
     ]);
   });
@@ -160,11 +194,16 @@ describe("outside-scope invoice draft", () => {
     const review = reviewInvoiceDraft({
       client: completeClient,
       draft: {
-        ...createInvoiceDraft(completeClient),
-        billableDays: "2",
+        ...createOutsideScopeDraft(completeClient),
         issueDate: "2026-09-04",
-        periodEnd: "2026-09-04",
-        periodStart: "2026-09-04",
+        serviceLines: [
+          {
+            ...createOutsideScopeDraft(completeClient).serviceLines[0],
+            billableDays: "2",
+            periodEnd: "2026-09-04",
+            periodStart: "2026-09-04",
+          },
+        ],
       },
       issuer: completeIssuer,
       today: businessDate,
@@ -173,8 +212,14 @@ describe("outside-scope invoice draft", () => {
     expect(review.formattedTotals).toBeNull();
     expect(review.totals).toBeNull();
     expect(review.errors).toContainEqual({
-      fieldName: "billableDays",
-      message: "Billable days cannot exceed the 1 day in the invoice period.",
+      location: { kind: "service-line", serviceLineIndex: 0, fieldName: "billableDays" },
+      message: "Billable days cannot exceed the 1 day in the service period.",
     });
   });
 });
+
+function createOutsideScopeDraft(client: typeof completeClient) {
+  const draft = createInvoiceDraft(client);
+  if (draft.vatTreatment !== "outside-scope") throw new Error("Expected outside-scope draft");
+  return draft;
+}

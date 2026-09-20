@@ -30,11 +30,8 @@ export function InvoiceDraftFeedback({
           </strong>
           <ul>
             {review.errors.map((error) => (
-              <li key={error.fieldName}>
-                <a
-                  href={`#draft-${error.fieldName}`}
-                  onClick={(event) => onErrorFollow(event, error)}
-                >
+              <li key={`${JSON.stringify(error.location)}-${error.message}`}>
+                <a href="#invoice-draft-error" onClick={(event) => onErrorFollow(event, error)}>
                   {error.message}
                 </a>
               </li>

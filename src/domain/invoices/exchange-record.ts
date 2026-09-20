@@ -1,8 +1,17 @@
 import { z } from "zod";
 
+import {
+  addDecimalAmounts,
+  calculatePercentageAndRoundDecimal,
+  divideAndRoundDecimal,
+} from "../money/decimal.ts";
+import { persistedVatRateSchema } from "../tax/vat-rate.ts";
 import { createFieldSchemas, normalizeRequiredMultiline } from "../validation/text-field.ts";
+import type {
+  NonEmptyReadonlyArray,
+  ReviewedTaxableInvoiceServiceLine,
+} from "./invoice-service-line.ts";
 import { persistedExchangeRateSchema } from "./exchange-rate.ts";
-import { calculateSterlingInvoiceTotals } from "./invoice-policy.ts";
 
 export const exchangeMethods = [
   "hmrc-period-rate",
@@ -28,17 +37,30 @@ const sterlingAmountSchema = z
   .string()
   .max(203)
   .regex(/^(?:0|[1-9]\d*)\.\d{2}$/u);
+const clientCurrencyAmountSchema = z
+  .string()
+  .max(203)
+  .regex(/^(?:0|[1-9]\d*)(?:\.\d+)?$/u);
+const sterlingTotalsSchema = z
+  .strictObject({
+    gross: sterlingAmountSchema,
+    net: sterlingAmountSchema,
+    vat: sterlingAmountSchema,
+  })
+  .readonly();
+export const persistedSterlingVatRateBucketSchema = z
+  .strictObject({
+    clientCurrencyNet: clientCurrencyAmountSchema,
+    sterlingTotals: sterlingTotalsSchema,
+    vatRate: persistedVatRateSchema,
+  })
+  .readonly();
 
 export const persistedSterlingVatSummarySchema = z
   .strictObject({
     exchangeRecord: persistedExchangeRecordSchema,
-    totals: z
-      .strictObject({
-        gross: sterlingAmountSchema,
-        net: sterlingAmountSchema,
-        vat: sterlingAmountSchema,
-      })
-      .readonly(),
+    totalsByRate: z.array(persistedSterlingVatRateBucketSchema).min(1).readonly(),
+    totals: sterlingTotalsSchema,
   })
   .readonly();
 
@@ -46,11 +68,40 @@ export type ExchangeMethod = (typeof exchangeMethods)[number];
 export type ExchangeRecord = Readonly<z.output<typeof persistedExchangeRecordSchema>>;
 export type SterlingVatSummary = Readonly<z.output<typeof persistedSterlingVatSummarySchema>>;
 
+type CreateSterlingVatSummaryOptions = Readonly<{
+  clientCurrencyMinorUnit: number;
+  exchangeRecord: ExchangeRecord;
+  serviceLines: NonEmptyReadonlyArray<ReviewedTaxableInvoiceServiceLine>;
+}>;
+
+export function createSterlingVatSummary({
+  clientCurrencyMinorUnit,
+  exchangeRecord,
+  serviceLines,
+}: CreateSterlingVatSummaryOptions): SterlingVatSummary {
+  const totalsByRate = groupClientCurrencyNetByVatRate(serviceLines, clientCurrencyMinorUnit).map(
+    ({ clientCurrencyNet, vatRate }) => ({
+      clientCurrencyNet,
+      sterlingTotals: calculateSterlingTotals(clientCurrencyNet, exchangeRecord.rate, vatRate),
+      vatRate,
+    }),
+  );
+  const totals = totalsByRate.reduce(
+    (aggregate, bucket) => ({
+      gross: addDecimalAmounts(aggregate.gross, bucket.sterlingTotals.gross, 2),
+      net: addDecimalAmounts(aggregate.net, bucket.sterlingTotals.net, 2),
+      vat: addDecimalAmounts(aggregate.vat, bucket.sterlingTotals.vat, 2),
+    }),
+    { gross: "0.00", net: "0.00", vat: "0.00" },
+  );
+  return persistedSterlingVatSummarySchema.parse({ exchangeRecord, totals, totalsByRate });
+}
+
 type SterlingVatSummaryCheckOptions = Readonly<{
-  clientCurrencyNet: string;
+  clientCurrencyMinorUnit: number;
+  serviceLines: NonEmptyReadonlyArray<ReviewedTaxableInvoiceServiceLine>;
   summary: SterlingVatSummary;
   taxPoint: string;
-  vatRate: string;
 }>;
 
 export type SterlingVatSummaryError = Readonly<{
@@ -59,27 +110,30 @@ export type SterlingVatSummaryError = Readonly<{
 }>;
 
 export function sterlingVatSummaryErrors({
-  clientCurrencyNet,
+  clientCurrencyMinorUnit,
+  serviceLines,
   summary,
   taxPoint,
-  vatRate,
 }: SterlingVatSummaryCheckOptions): readonly SterlingVatSummaryError[] {
   const errors: SterlingVatSummaryError[] = [];
   const applicabilityError = exchangeDateApplicabilityError(summary.exchangeRecord, taxPoint);
   if (applicabilityError) {
-    errors.push({
-      message: applicabilityError,
-      path: ["exchangeRecord", "effectiveDate"],
-    });
+    errors.push({ message: applicabilityError, path: ["exchangeRecord", "effectiveDate"] });
   }
 
-  const expectedTotals = calculateSterlingInvoiceTotals({
-    clientCurrencyNet,
-    exchangeRate: summary.exchangeRecord.rate,
-    vatRate,
+  const expectedSummary = createSterlingVatSummary({
+    clientCurrencyMinorUnit,
+    exchangeRecord: summary.exchangeRecord,
+    serviceLines,
   });
+  if (JSON.stringify(summary.totalsByRate) !== JSON.stringify(expectedSummary.totalsByRate)) {
+    errors.push({
+      message: "The immutable sterling VAT-rate totals do not match the invoice calculation.",
+      path: ["totalsByRate"],
+    });
+  }
   for (const totalName of ["net", "vat", "gross"] as const) {
-    if (summary.totals[totalName] !== expectedTotals[totalName]) {
+    if (summary.totals[totalName] !== expectedSummary.totals[totalName]) {
       errors.push({
         message: `The immutable sterling ${totalName} total does not match the invoice calculation.`,
         path: ["totals", totalName],
@@ -104,4 +158,34 @@ export function exchangeDateApplicabilityError(
   return exchangeRecord.effectiveDate === taxPoint
     ? null
     : "The exchange-rate date must match the tax point for this method.";
+}
+
+function groupClientCurrencyNetByVatRate(
+  serviceLines: NonEmptyReadonlyArray<ReviewedTaxableInvoiceServiceLine>,
+  minorUnit: number,
+): NonEmptyReadonlyArray<Readonly<{ clientCurrencyNet: string; vatRate: string }>> {
+  const zero = minorUnit === 0 ? "0" : `0.${"0".repeat(minorUnit)}`;
+  const grouped = new Map<string, string>();
+  for (const serviceLine of serviceLines) {
+    grouped.set(
+      serviceLine.vatRate,
+      addDecimalAmounts(
+        grouped.get(serviceLine.vatRate) ?? zero,
+        serviceLine.totals.net,
+        minorUnit,
+      ),
+    );
+  }
+  const [first, ...rest] = grouped.entries();
+  if (!first) throw new Error("A taxable invoice must contain at least one service line");
+  return [
+    { clientCurrencyNet: first[1], vatRate: first[0] },
+    ...rest.map(([vatRate, clientCurrencyNet]) => ({ clientCurrencyNet, vatRate })),
+  ];
+}
+
+function calculateSterlingTotals(clientCurrencyNet: string, exchangeRate: string, vatRate: string) {
+  const net = divideAndRoundDecimal(clientCurrencyNet, exchangeRate, 2);
+  const vat = calculatePercentageAndRoundDecimal(net, vatRate, 2);
+  return { gross: addDecimalAmounts(net, vat, 2), net, vat };
 }

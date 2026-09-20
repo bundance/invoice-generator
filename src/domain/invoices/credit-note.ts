@@ -5,10 +5,17 @@ import {
   normalizeRequiredMultiline,
   type NormalizedField,
 } from "../validation/text-field.ts";
-import { persistedExchangeRecordSchema } from "./exchange-record.ts";
+import {
+  persistedExchangeRecordSchema,
+  persistedSterlingVatRateBucketSchema,
+} from "./exchange-record.ts";
 import { type IssuedInvoice, unrefinedIssuedInvoiceSnapshotSchema } from "./issued-invoice.ts";
 import { createInvoiceTaxFactsSchema } from "./invoice-tax-facts.ts";
 import type { BusinessDate } from "../time/business-date.ts";
+import {
+  persistedCreditServiceLineSchema,
+  reverseIssuedInvoiceServiceLines,
+} from "./invoice-service-line.ts";
 
 const creditNoteIdSchema = z
   .string()
@@ -23,6 +30,10 @@ const sterlingCreditAmountSchema = z
   .string()
   .max(204)
   .regex(/^(?:0\.00|-(?:0\.(?:0[1-9]|[1-9]\d)|[1-9]\d*\.\d{2}))$/u);
+const clientCurrencyCreditAmountSchema = z
+  .string()
+  .max(204)
+  .regex(/^(?:0(?:\.0+)?|-(?:0\.\d*[1-9]\d*|[1-9]\d*(?:\.\d+)?))$/u);
 const correctionReasonSchemas = createFieldSchemas<"CorrectionReason">(normalizeCorrectionReason);
 const retainedCreditNotePdfSchema = z
   .strictObject({
@@ -34,6 +45,21 @@ const creditNoteTaxFactsSchema = createInvoiceTaxFactsSchema(
   z
     .strictObject({
       exchangeRecord: persistedExchangeRecordSchema,
+      totalsByRate: z
+        .array(
+          persistedSterlingVatRateBucketSchema.unwrap().extend({
+            clientCurrencyNet: clientCurrencyCreditAmountSchema,
+            sterlingTotals: z
+              .strictObject({
+                gross: sterlingCreditAmountSchema,
+                net: sterlingCreditAmountSchema,
+                vat: sterlingCreditAmountSchema,
+              })
+              .readonly(),
+          }),
+        )
+        .min(1)
+        .readonly(),
       totals: z
         .strictObject({
           gross: sterlingCreditAmountSchema,
@@ -46,17 +72,17 @@ const creditNoteTaxFactsSchema = createInvoiceTaxFactsSchema(
 );
 
 const originalInvoiceFields = unrefinedIssuedInvoiceSnapshotSchema.omit({
-  billableDays: true,
   id: true,
   invoiceNumber: true,
   issue: true,
+  serviceLines: true,
   taxFacts: true,
   totals: true,
 });
 
 const creditNoteSnapshotSchema = originalInvoiceFields
   .extend({
-    billableDays: signedDecimalSchema,
+    serviceLines: z.array(persistedCreditServiceLineSchema).min(1).readonly(),
     id: creditNoteIdSchema,
     originalInvoiceId: unrefinedIssuedInvoiceSnapshotSchema.shape.id,
     originalIssueDate: z.iso.date(),
@@ -239,10 +265,8 @@ function createCandidate(
   reason: string,
 ): FullCreditNoteCandidate {
   return fullCreditNoteCandidateSchema.parse({
-    billableDays: negateDecimal(invoice.billableDays),
     client: invoice.client,
     currency: invoice.currency,
-    dayRate: invoice.dayRate,
     id: `CN-${invoice.id}`,
     issuer: invoice.issuer,
     issueDate,
@@ -250,11 +274,9 @@ function createCandidate(
     originalInvoiceId: invoice.id,
     originalIssueDate: invoice.issue.date,
     paymentTerms: invoice.paymentTerms,
-    periodEnd: invoice.periodEnd,
-    periodStart: invoice.periodStart,
     purchaseOrder: invoice.purchaseOrder,
     reason,
-    serviceDescription: invoice.serviceDescription,
+    serviceLines: reverseIssuedInvoiceServiceLines(asNonEmpty(invoice.serviceLines)),
     taxFacts: copyCreditTaxFacts(invoice),
     totals: {
       gross: negateDecimal(invoice.totals.gross),
@@ -282,6 +304,15 @@ function copyCreditTaxFacts(invoice: IssuedInvoice): CreditNoteTaxFacts {
     ...invoice.taxFacts,
     sterlingVatSummary: {
       ...invoice.taxFacts.sterlingVatSummary,
+      totalsByRate: invoice.taxFacts.sterlingVatSummary.totalsByRate.map((bucket) => ({
+        ...bucket,
+        clientCurrencyNet: negateDecimal(bucket.clientCurrencyNet),
+        sterlingTotals: {
+          gross: negateDecimal(bucket.sterlingTotals.gross),
+          net: negateDecimal(bucket.sterlingTotals.net),
+          vat: negateDecimal(bucket.sterlingTotals.vat),
+        },
+      })),
       totals: {
         gross: negateDecimal(invoice.taxFacts.sterlingVatSummary.totals.gross),
         net: negateDecimal(invoice.taxFacts.sterlingVatSummary.totals.net),
@@ -289,6 +320,12 @@ function copyCreditTaxFacts(invoice: IssuedInvoice): CreditNoteTaxFacts {
       },
     },
   });
+}
+
+function asNonEmpty<Value>(values: readonly Value[]): readonly [Value, ...Value[]] {
+  const [first, ...rest] = values;
+  if (!first) throw new Error("An issued invoice must contain at least one service line");
+  return [first, ...rest];
 }
 
 function negateDecimal(value: string): string {

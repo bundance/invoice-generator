@@ -1,29 +1,38 @@
-import type { InvoiceCandidate, InvoiceDraftReview } from "../domain/invoices/invoice-draft.ts";
 import type {
   CreditNote,
   CreditNoteSnapshot,
   CreditNoteTaxFacts,
   FullCreditNoteCandidate,
 } from "../domain/invoices/credit-note.ts";
+import type { InvoiceCandidate, InvoiceDraftReview } from "../domain/invoices/invoice-draft.ts";
 import type { InvoiceTaxFacts } from "../domain/invoices/invoice-tax-facts.ts";
 import type { IssuedInvoice, IssuedInvoiceSnapshot } from "../domain/invoices/issued-invoice.ts";
 import type { IssuerSettings } from "../domain/issuer/issuer-settings.ts";
 import { formatCurrencyAmount } from "../domain/money/decimal.ts";
 import { formatSterlingVatSummary, type SterlingVatDetails } from "./exchange-presentation.ts";
 
+type BillingDocumentServiceLine = Readonly<{
+  renderKey: string;
+  serviceDescription: string;
+  periodStart: string;
+  periodEnd: string;
+  billableDays: string;
+  dayRate: string;
+  vatRate: string | null;
+  net: string;
+  vat: string;
+  gross: string;
+}>;
+
 type SharedBillingDocumentModel = Readonly<{
   id: string;
   issuer: IssuerSettings;
   clientLegalName: string;
   clientPostalAddress: string;
-  serviceDescription: string;
+  serviceLines: readonly BillingDocumentServiceLine[];
   sterlingVatSummary: SterlingVatDetails | null;
   taxPoint: string | null;
-  periodStart: string;
-  periodEnd: string;
   issueDate: string;
-  billableDays: string;
-  dayRate: string;
   net: string;
   vat: string;
   gross: string;
@@ -31,7 +40,6 @@ type SharedBillingDocumentModel = Readonly<{
   paymentTerms: string;
   notes: readonly string[];
   vatWording: string;
-  vatRate: string | null;
 }>;
 
 export type BillingDocumentModel =
@@ -75,20 +83,24 @@ export function createCandidateInvoiceDocumentModel(
 }
 
 type FinalBillingDocumentFacts = Readonly<{
-  billableDays: string;
   client: Readonly<{ legalName: string; postalAddress: string }>;
   currency: Readonly<{ code: string; minorUnit: number }>;
-  dayRate: string;
   id?: string;
   issuer: IssuerSettings;
   issueDate: string;
   notes: string;
   paymentTerms: string;
-  periodEnd: string;
-  periodStart: string;
   proposedInvoiceId?: string;
   purchaseOrder: string;
-  serviceDescription: string;
+  serviceLines: readonly Readonly<{
+    billableDays: string;
+    dayRate: string;
+    periodEnd: string;
+    periodStart: string;
+    serviceDescription: string;
+    totals: Readonly<{ gross: string; net: string; vat: string }>;
+    vatRate?: string;
+  }>[];
   taxFacts: CreditNoteTaxFacts | InvoiceTaxFacts;
   totals: Readonly<{ gross: string; net: string; vat: string }>;
 }>;
@@ -104,14 +116,21 @@ function createFinalBillingDocumentModel(
     issuer: document.issuer,
     clientLegalName: document.client.legalName,
     clientPostalAddress: document.client.postalAddress,
-    serviceDescription: document.serviceDescription,
+    serviceLines: document.serviceLines.map((serviceLine, index) => ({
+      renderKey: `${serviceLine.serviceDescription}-${serviceLine.periodStart}-${serviceLine.periodEnd}-${index + 1}`,
+      billableDays: serviceLine.billableDays,
+      dayRate: formatAmount(serviceLine.dayRate),
+      gross: formatAmount(serviceLine.totals.gross),
+      net: formatAmount(serviceLine.totals.net),
+      periodEnd: serviceLine.periodEnd,
+      periodStart: serviceLine.periodStart,
+      serviceDescription: serviceLine.serviceDescription,
+      vat: formatAmount(serviceLine.totals.vat),
+      vatRate: serviceLine.vatRate ?? null,
+    })),
     sterlingVatSummary: taxPresentation.sterlingVatSummary,
     taxPoint: taxPresentation.taxPoint,
-    periodStart: document.periodStart,
-    periodEnd: document.periodEnd,
     issueDate: document.issueDate,
-    billableDays: document.billableDays,
-    dayRate: formatAmount(document.dayRate),
     net: formatAmount(document.totals.net),
     vat: formatAmount(document.totals.vat),
     gross: formatAmount(document.totals.gross),
@@ -119,14 +138,12 @@ function createFinalBillingDocumentModel(
     paymentTerms: document.paymentTerms,
     notes: documentNotes(document.purchaseOrder, document.notes),
     vatWording: taxPresentation.vatWording,
-    vatRate: taxPresentation.vatRate,
   };
 }
 
 type TaxPresentation = Readonly<{
   sterlingVatSummary: SterlingVatDetails | null;
   taxPoint: string | null;
-  vatRate: string | null;
   vatWording: string;
 }>;
 
@@ -140,7 +157,6 @@ function createTaxPresentation(
   return {
     sterlingVatSummary: formatSterlingVatSummary(sterlingVatSummary, currencyCode),
     taxPoint: ukTaxTreatment?.taxPoint ?? null,
-    vatRate: ukTaxTreatment?.rate ?? null,
     vatWording: taxFacts.vatTreatment.wording,
   };
 }
@@ -160,17 +176,27 @@ export function createDraftInvoiceDocumentModel(
     issuer,
     clientLegalName: displayValue(preview.clientLegalName, "Client not entered"),
     clientPostalAddress: displayValue(preview.clientPostalAddress, "Postal address not entered"),
-    serviceDescription: displayValue(preview.serviceDescription, "Service description not entered"),
+    serviceLines: preview.serviceLines.map((serviceLine, index) => ({
+      renderKey: `${serviceLine.serviceDescription ?? "untitled"}-${serviceLine.periodStart ?? "start"}-${serviceLine.periodEnd ?? "end"}-${index + 1}`,
+      billableDays: displayValue(serviceLine.billableDays, "Unavailable"),
+      dayRate: displayValue(serviceLine.formattedDayRate, "Unavailable"),
+      gross: draftLineTotal(serviceLine.formattedTotals, "gross"),
+      net: draftLineTotal(serviceLine.formattedTotals, "net"),
+      periodEnd: displayValue(serviceLine.periodEnd, "not entered"),
+      periodStart: displayValue(serviceLine.periodStart, "not entered"),
+      serviceDescription: displayValue(
+        serviceLine.serviceDescription,
+        "Service description not entered",
+      ),
+      vat: draftLineTotal(serviceLine.formattedTotals, "vat"),
+      vatRate: serviceLine.vatRate,
+    })),
     sterlingVatSummary: formatSterlingVatSummary(
       review.sterlingVatSummary,
       preview.currencyCode ?? "",
     ),
     taxPoint: preview.taxPoint,
-    periodStart: displayValue(preview.periodStart, "not entered"),
-    periodEnd: displayValue(preview.periodEnd, "not entered"),
     issueDate: displayValue(preview.issueDate, "Date not entered"),
-    billableDays: displayValue(preview.billableDays, "Unavailable"),
-    dayRate: displayValue(preview.formattedDayRate, "Unavailable"),
     net: draftTotal(review, "net"),
     vat: draftTotal(review, "vat"),
     gross: draftTotal(review, "gross"),
@@ -178,12 +204,18 @@ export function createDraftInvoiceDocumentModel(
     paymentTerms: displayValue(preview.paymentTerms, "Not entered"),
     notes: documentNotes(displayValue(preview.purchaseOrder, ""), displayValue(preview.notes, "")),
     vatWording: preview.vatWording,
-    vatRate: preview.vatRate,
   };
 }
 
 function displayValue(value: string | null, fallback: string): string {
   return value ?? fallback;
+}
+
+function draftLineTotal(
+  totals: Readonly<{ gross: string; net: string; vat: string }> | null,
+  name: "gross" | "net" | "vat",
+): string {
+  return totals?.[name] ?? "Unavailable";
 }
 
 function draftTotal(

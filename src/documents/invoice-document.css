@@ -194,14 +194,6 @@
   text-transform: uppercase;
 }
 
-.invoice-document:has(.credit-note-link) .service-row {
-  height: 48mm;
-}
-
-.invoice-document:has(.credit-note-link) .service-copy {
-  height: 38mm;
-}
-
 .document-table th,
 .document-table td {
   padding: 2.3mm 2mm;
@@ -241,22 +233,20 @@
 }
 
 .service-row {
-  height: 61mm;
   line-height: 1.38;
 }
 
 .service-copy {
-  height: 55mm;
+  min-height: 12mm;
+  max-height: 28mm;
   overflow: hidden;
   white-space: pre-line;
 }
 
-.invoice-document--sterling-vat .service-row {
-  height: 41mm;
-}
-
-.invoice-document--sterling-vat .service-copy {
-  height: 35mm;
+.service-row small {
+  display: block;
+  color: #5c5852;
+  font-size: 7pt;
 }
 
 .invoice-document--sterling-vat:has(.credit-note-link) .service-row {
