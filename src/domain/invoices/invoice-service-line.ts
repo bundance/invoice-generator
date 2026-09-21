@@ -128,21 +128,28 @@ type ReviewedInvoiceServiceLineCommon = Readonly<{
   totals: InvoiceServiceLineTotals;
 }>;
 
-export type ReviewedTaxableInvoiceServiceLine = ReviewedInvoiceServiceLineCommon &
+export type TaxableInvoiceServiceLine = ReviewedInvoiceServiceLineCommon &
   Readonly<{ vatRate: string }>;
-export type ReviewedOutsideScopeInvoiceServiceLine = ReviewedInvoiceServiceLineCommon;
+export type OutsideScopeInvoiceServiceLine = ReviewedInvoiceServiceLineCommon &
+  Readonly<{ vatRate?: never }>;
+export type InvoiceServiceLine = TaxableInvoiceServiceLine | OutsideScopeInvoiceServiceLine;
+export type ReviewedTaxableInvoiceServiceLine = TaxableInvoiceServiceLine;
+export type ReviewedOutsideScopeInvoiceServiceLine = OutsideScopeInvoiceServiceLine;
 export type ReviewedInvoiceServiceLine =
   | ReviewedTaxableInvoiceServiceLine
   | ReviewedOutsideScopeInvoiceServiceLine;
+export type TaxableCreditNoteServiceLine = ReviewedInvoiceServiceLineCommon &
+  Readonly<{ vatRate: string }>;
+export type OutsideScopeCreditNoteServiceLine = ReviewedInvoiceServiceLineCommon &
+  Readonly<{ vatRate?: never }>;
+export type CreditNoteServiceLine =
+  | TaxableCreditNoteServiceLine
+  | OutsideScopeCreditNoteServiceLine;
 
-export type CreditNoteServiceLine = Readonly<{
-  billableDays: string;
-  dayRate: string;
+export type ServiceLineSummary = Readonly<{
   periodEnd: string;
   periodStart: string;
-  serviceDescription: string;
-  totals: InvoiceServiceLineTotals;
-  vatRate?: string;
+  vatRates: readonly string[];
 }>;
 
 export type InvoiceServiceLineError = Readonly<{
@@ -245,6 +252,30 @@ export function reverseIssuedInvoiceServiceLines(
       vat: negateDecimal(serviceLine.totals.vat),
     },
   }));
+}
+
+export function summarizeServiceLines(
+  serviceLines: NonEmptyReadonlyArray<ReviewedInvoiceServiceLine | CreditNoteServiceLine>,
+): ServiceLineSummary {
+  const [firstLine, ...remainingLines] = serviceLines;
+  const vatRates = new Set<string>();
+
+  for (const serviceLine of serviceLines) {
+    if ("vatRate" in serviceLine) vatRates.add(serviceLine.vatRate);
+  }
+
+  return {
+    periodEnd: remainingLines.reduce(
+      (latest, serviceLine) => (serviceLine.periodEnd > latest ? serviceLine.periodEnd : latest),
+      firstLine.periodEnd,
+    ),
+    periodStart: remainingLines.reduce(
+      (earliest, serviceLine) =>
+        serviceLine.periodStart < earliest ? serviceLine.periodStart : earliest,
+      firstLine.periodStart,
+    ),
+    vatRates: [...vatRates],
+  };
 }
 
 function normalizeServiceLine(

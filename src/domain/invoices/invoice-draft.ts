@@ -183,8 +183,9 @@ type ReviewInvoiceDraftOptions = Readonly<{
   today: BusinessDate;
 }>;
 
-function createInvoiceServiceLineInput(
+export function createInvoiceServiceLineInput(
   client: Client,
+  currentDraft?: InvoiceDraftInput,
 ): TaxableInvoiceServiceLineInput | OutsideScopeInvoiceServiceLineInput {
   const commonLine = {
     billableDays: "",
@@ -193,12 +194,19 @@ function createInvoiceServiceLineInput(
     periodStart: "",
     serviceDescription: client.defaultServiceDescription,
   };
-  return client.vatTreatment.kind === "uk-taxable"
-    ? { ...commonLine, vatRate: client.vatTreatment.rate }
-    : commonLine;
+  const targetVatTreatment = currentDraft?.vatTreatment ?? client.vatTreatment.kind;
+  if (targetVatTreatment === "outside-scope") return commonLine;
+  if (client.vatTreatment.kind === "uk-taxable") {
+    return { ...commonLine, vatRate: client.vatTreatment.rate };
+  }
+  if (currentDraft?.vatTreatment === "uk-taxable") {
+    return { ...commonLine, vatRate: currentDraft.serviceLines[0].vatRate };
+  }
+  throw new Error("A taxable service line requires a VAT rate");
 }
 
 export function createInvoiceDraft(client: Client): InvoiceDraftInput {
+  const serviceLine = createInvoiceServiceLineInput(client);
   const commonDraftFields = {
     clientId: client.id,
     clientLegalName: client.legalName,
@@ -209,20 +217,21 @@ export function createInvoiceDraft(client: Client): InvoiceDraftInput {
     notes: "",
     purchaseOrder: "",
   };
-  if (client.vatTreatment.kind === "uk-taxable") {
+  if ("vatRate" in serviceLine) {
     return {
       ...commonDraftFields,
-      serviceLines: [
-        { ...createInvoiceServiceLineInput(client), vatRate: client.vatTreatment.rate },
-      ],
+      serviceLines: [serviceLine],
       vatTreatment: "uk-taxable",
       taxPoint: "",
       exchange: createExchangeDraft(client.currency.code),
     };
   }
+  if (client.vatTreatment.kind !== "outside-scope") {
+    throw new Error("A taxable client must create a taxable service line");
+  }
   return {
     ...commonDraftFields,
-    serviceLines: [createInvoiceServiceLineInput(client)],
+    serviceLines: [serviceLine],
     vatTreatment: "outside-scope",
     outsideScopeEvidenceReference: client.vatTreatment.evidenceReference,
     reverseCharge: client.vatTreatment.reverseCharge,

@@ -4,8 +4,9 @@ import type { releasedWorkspaceStateV6Schema } from "./released-workspace-state-
 
 type ReleasedWorkspaceStateV6 = z.output<typeof releasedWorkspaceStateV6Schema>;
 type ReleasedInvoiceDraftV6 = NonNullable<ReleasedWorkspaceStateV6["draft"]>["draft"];
-type ReleasedIssuedInvoiceV6 = ReleasedWorkspaceStateV6["issuedInvoices"][number];
-type ReleasedCreditNoteV6 = ReleasedWorkspaceStateV6["creditNotes"][number];
+type ReleasedFinalDocumentV6 =
+  | ReleasedWorkspaceStateV6["issuedInvoices"][number]
+  | ReleasedWorkspaceStateV6["creditNotes"][number];
 
 export function upgradeSchemaSixWorkspaceState(workspace: ReleasedWorkspaceStateV6) {
   return {
@@ -14,8 +15,8 @@ export function upgradeSchemaSixWorkspaceState(workspace: ReleasedWorkspaceState
     draft: workspace.draft
       ? { ...workspace.draft, draft: upgradeDraft(workspace.draft.draft) }
       : null,
-    issuedInvoices: workspace.issuedInvoices.map(upgradeIssuedInvoice),
-    creditNotes: workspace.creditNotes.map(upgradeCreditNote),
+    issuedInvoices: workspace.issuedInvoices.map(upgradeLegacyFinalDocument),
+    creditNotes: workspace.creditNotes.map(upgradeLegacyFinalDocument),
   };
 }
 
@@ -44,7 +45,7 @@ function upgradeDraft(draft: ReleasedInvoiceDraftV6) {
   };
 }
 
-function upgradeIssuedInvoice(invoice: ReleasedIssuedInvoiceV6) {
+function upgradeLegacyFinalDocument<Document extends ReleasedFinalDocumentV6>(document: Document) {
   const {
     billableDays,
     dayRate,
@@ -52,57 +53,28 @@ function upgradeIssuedInvoice(invoice: ReleasedIssuedInvoiceV6) {
     periodStart,
     serviceDescription,
     taxFacts,
-    ...invoiceFields
-  } = invoice;
+    ...documentFields
+  } = document;
   const commonServiceLine = {
     billableDays,
     dayRate,
     periodEnd,
     periodStart,
     serviceDescription,
-    totals: invoice.totals,
+    totals: document.totals,
   };
   const serviceLine =
     taxFacts.vatTreatment.kind === "uk-taxable"
       ? { ...commonServiceLine, vatRate: taxFacts.vatTreatment.rate }
       : commonServiceLine;
   return {
-    ...invoiceFields,
+    ...documentFields,
     serviceLines: [serviceLine] as const,
-    taxFacts: upgradeTaxFacts(taxFacts, invoice.totals.net),
+    taxFacts: upgradeTaxFacts(taxFacts, document.totals.net),
   };
 }
 
-function upgradeCreditNote(creditNote: ReleasedCreditNoteV6) {
-  const {
-    billableDays,
-    dayRate,
-    periodEnd,
-    periodStart,
-    serviceDescription,
-    taxFacts,
-    ...creditNoteFields
-  } = creditNote;
-  const commonServiceLine = {
-    billableDays,
-    dayRate,
-    periodEnd,
-    periodStart,
-    serviceDescription,
-    totals: creditNote.totals,
-  };
-  const serviceLine =
-    taxFacts.vatTreatment.kind === "uk-taxable"
-      ? { ...commonServiceLine, vatRate: taxFacts.vatTreatment.rate }
-      : commonServiceLine;
-  return {
-    ...creditNoteFields,
-    serviceLines: [serviceLine] as const,
-    taxFacts: upgradeTaxFacts(taxFacts, creditNote.totals.net),
-  };
-}
-
-function upgradeTaxFacts(taxFacts: ReleasedIssuedInvoiceV6["taxFacts"], clientCurrencyNet: string) {
+function upgradeTaxFacts(taxFacts: ReleasedFinalDocumentV6["taxFacts"], clientCurrencyNet: string) {
   if (taxFacts.vatTreatment.kind === "outside-scope") return taxFacts;
 
   const { rate, ...vatTreatment } = taxFacts.vatTreatment;

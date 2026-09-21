@@ -82,7 +82,9 @@ const originalInvoiceFields = unrefinedIssuedInvoiceSnapshotSchema.omit({
 
 const creditNoteSnapshotSchema = originalInvoiceFields
   .extend({
-    serviceLines: z.array(persistedCreditServiceLineSchema).min(1).readonly(),
+    serviceLines: z
+      .tuple([persistedCreditServiceLineSchema], persistedCreditServiceLineSchema)
+      .readonly(),
     id: creditNoteIdSchema,
     originalInvoiceId: unrefinedIssuedInvoiceSnapshotSchema.shape.id,
     originalIssueDate: z.iso.date(),
@@ -276,7 +278,7 @@ function createCandidate(
     paymentTerms: invoice.paymentTerms,
     purchaseOrder: invoice.purchaseOrder,
     reason,
-    serviceLines: reverseIssuedInvoiceServiceLines(asNonEmpty(invoice.serviceLines)),
+    serviceLines: reverseIssuedInvoiceServiceLines(invoice.serviceLines),
     taxFacts: copyCreditTaxFacts(invoice),
     totals: {
       gross: negateDecimal(invoice.totals.gross),
@@ -320,12 +322,6 @@ function copyCreditTaxFacts(invoice: IssuedInvoice): CreditNoteTaxFacts {
       },
     },
   });
-}
-
-function asNonEmpty<Value>(values: readonly Value[]): readonly [Value, ...Value[]] {
-  const [first, ...rest] = values;
-  if (!first) throw new Error("An issued invoice must contain at least one service line");
-  return [first, ...rest];
 }
 
 function negateDecimal(value: string): string {

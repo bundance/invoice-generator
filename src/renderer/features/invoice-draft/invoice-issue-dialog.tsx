@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 
 import type { InvoiceIssueReviewResult } from "../../../application/invoice-application-contract.ts";
+import { summarizeServiceLines } from "../../../domain/invoices/invoice-service-line.ts";
 import { formatCurrencyAmount } from "../../../domain/money/decimal.ts";
 import { formatSterlingVatSummary } from "../../../documents/exchange-presentation.ts";
 import { InvoiceVatFacts } from "../../ui/invoice-vat-facts.tsx";
@@ -34,17 +35,7 @@ export function InvoiceIssueDialog({
       : null,
     candidate.currency.code,
   );
-  const periodStart = candidate.serviceLines.reduce(
-    (earliest, line) => (line.periodStart < earliest ? line.periodStart : earliest),
-    candidate.serviceLines[0].periodStart,
-  );
-  const periodEnd = candidate.serviceLines.reduce(
-    (latest, line) => (line.periodEnd > latest ? line.periodEnd : latest),
-    candidate.serviceLines[0].periodEnd,
-  );
-  const vatRates = [
-    ...new Set(candidate.serviceLines.flatMap((line) => ("vatRate" in line ? [line.vatRate] : []))),
-  ];
+  const { periodEnd, periodStart, vatRates } = summarizeServiceLines(candidate.serviceLines);
 
   return (
     <ModalDialog

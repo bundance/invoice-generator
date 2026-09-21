@@ -2,13 +2,52 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { persistedClientSchema } from "../clients/client.ts";
 import { parseBusinessDate } from "../time/business-date.ts";
-import { createInvoiceDraft, reviewInvoiceDraft } from "./invoice-draft.ts";
-import { completeClient } from "../../../tests/fixtures/client.ts";
+import {
+  createInvoiceDraft,
+  createInvoiceServiceLineInput,
+  reviewInvoiceDraft,
+} from "./invoice-draft.ts";
+import { completeClient, completeGbpVatClient } from "../../../tests/fixtures/client.ts";
 import { completeIssuer } from "../../../tests/fixtures/issuer-settings.ts";
 
 const businessDate = parseBusinessDate("2026-09-04");
 
+if (completeGbpVatClient.vatTreatment.kind !== "uk-taxable") {
+  throw new Error("Expected a UK-taxable client fixture");
+}
+const completeGbpVatRate = completeGbpVatClient.vatTreatment.rate;
+
 describe("outside-scope invoice draft", () => {
+  it("uses the same client defaults for new taxable and outside-scope service lines", () => {
+    const taxableDraft = createInvoiceDraft(completeGbpVatClient);
+    if (taxableDraft.vatTreatment !== "uk-taxable") {
+      throw new Error("Expected a UK-taxable draft fixture");
+    }
+    const outsideScopeDraft = createInvoiceDraft(completeClient);
+
+    expect(createInvoiceServiceLineInput(completeClient)).toEqual({
+      billableDays: "",
+      dayRate: completeClient.standardDayRate,
+      periodEnd: "",
+      periodStart: "",
+      serviceDescription: completeClient.defaultServiceDescription,
+    });
+    expect(createInvoiceServiceLineInput(completeGbpVatClient)).toEqual({
+      billableDays: "",
+      dayRate: completeGbpVatClient.standardDayRate,
+      periodEnd: "",
+      periodStart: "",
+      serviceDescription: completeGbpVatClient.defaultServiceDescription,
+      vatRate: completeGbpVatRate,
+    });
+    expect(
+      createInvoiceServiceLineInput(completeGbpVatClient, outsideScopeDraft),
+    ).not.toHaveProperty("vatRate");
+    expect(createInvoiceServiceLineInput(completeClient, taxableDraft)).toMatchObject({
+      vatRate: taxableDraft.serviceLines[0].vatRate,
+    });
+  });
+
   it("copies editable client defaults and calculates exact half-up totals without using a number", () => {
     const draft = {
       ...createOutsideScopeDraft(completeClient),

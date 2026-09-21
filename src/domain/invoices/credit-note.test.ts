@@ -1,14 +1,35 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 
 import {
   completeForeignCurrencyVatIssuedInvoice,
   completeIssuedInvoice,
 } from "../../../tests/fixtures/issued-invoice.js";
 import { parseBusinessDate } from "../time/business-date.js";
-import { createFullCreditNoteSnapshot, reviewFullCreditNote } from "./credit-note.js";
+import {
+  createFullCreditNoteSnapshot,
+  reviewFullCreditNote,
+  type CreditNote,
+} from "./credit-note.js";
 import { persistedIssuedInvoiceSchema } from "./issued-invoice.js";
+import type {
+  CreditNoteServiceLine,
+  NonEmptyReadonlyArray,
+  OutsideScopeCreditNoteServiceLine,
+  TaxableCreditNoteServiceLine,
+} from "./invoice-service-line.js";
 
 describe("full credit note", () => {
+  it("exposes non-empty tax-variant service lines", () => {
+    expectTypeOf<CreditNote["serviceLines"]>().toExtend<
+      NonEmptyReadonlyArray<CreditNoteServiceLine>
+    >();
+    expectTypeOf<CreditNoteServiceLine>().toEqualTypeOf<
+      TaxableCreditNoteServiceLine | OutsideScopeCreditNoteServiceLine
+    >();
+    expectTypeOf<TaxableCreditNoteServiceLine>().not.toExtend<OutsideScopeCreditNoteServiceLine>();
+    expectTypeOf<OutsideScopeCreditNoteServiceLine>().not.toExtend<TaxableCreditNoteServiceLine>();
+  });
+
   it("copies an outside-scope invoice and exactly negates its stored values", () => {
     const review = reviewFullCreditNote({
       input: {

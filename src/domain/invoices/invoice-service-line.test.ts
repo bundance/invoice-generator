@@ -4,6 +4,7 @@ import { findCurrency } from "../money/currency.ts";
 import {
   reviewInvoiceServiceLines,
   reverseIssuedInvoiceServiceLines,
+  summarizeServiceLines,
 } from "./invoice-service-line.ts";
 
 const gbp = findCurrency("GBP");
@@ -208,5 +209,64 @@ describe("invoice service lines", () => {
         vatRate: "20",
       },
     ]);
+  });
+
+  it("summarizes period bounds and VAT rates in first-seen order", () => {
+    const totals = { gross: "120.00", net: "100.00", vat: "20.00" };
+
+    expect(
+      summarizeServiceLines([
+        {
+          billableDays: "1",
+          dayRate: "100",
+          periodEnd: "2026-09-06",
+          periodStart: "2026-09-04",
+          serviceDescription: "First service",
+          totals,
+          vatRate: "20",
+        },
+        {
+          billableDays: "1",
+          dayRate: "100",
+          periodEnd: "2026-09-03",
+          periodStart: "2026-09-02",
+          serviceDescription: "Second service",
+          totals,
+          vatRate: "5",
+        },
+        {
+          billableDays: "1",
+          dayRate: "100",
+          periodEnd: "2026-09-08",
+          periodStart: "2026-09-07",
+          serviceDescription: "Third service",
+          totals,
+          vatRate: "20",
+        },
+      ]),
+    ).toEqual({
+      periodEnd: "2026-09-08",
+      periodStart: "2026-09-02",
+      vatRates: ["20", "5"],
+    });
+  });
+
+  it("summarizes outside-scope lines without inventing VAT rates", () => {
+    expect(
+      summarizeServiceLines([
+        {
+          billableDays: "1",
+          dayRate: "100",
+          periodEnd: "2026-09-02",
+          periodStart: "2026-09-02",
+          serviceDescription: "Outside-scope service",
+          totals: { gross: "100.00", net: "100.00", vat: "0.00" },
+        },
+      ]),
+    ).toEqual({
+      periodEnd: "2026-09-02",
+      periodStart: "2026-09-02",
+      vatRates: [],
+    });
   });
 });

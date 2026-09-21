@@ -21,6 +21,7 @@ import {
 } from "./invoice-policy.ts";
 import {
   persistedInvoiceServiceLineSchema,
+  summarizeServiceLines,
   type NonEmptyReadonlyArray,
   type ReviewedTaxableInvoiceServiceLine,
 } from "./invoice-service-line.ts";
@@ -73,7 +74,9 @@ const issuedInvoiceSnapshotFields = {
     })
     .readonly(),
   currency: historicalCurrencySchema,
-  serviceLines: z.array(persistedInvoiceServiceLineSchema).min(1).readonly(),
+  serviceLines: z
+    .tuple([persistedInvoiceServiceLineSchema], persistedInvoiceServiceLineSchema)
+    .readonly(),
   paymentTerms: requiredSingleLineSchema,
   notes: optionalMultilineSchema,
   purchaseOrder: optionalSingleLineSchema,
@@ -394,7 +397,7 @@ function checkInvoiceVatCurrency(invoice: InvoiceFacts, context: RefinementConte
 function checkSterlingVatSummary(invoice: InvoiceFacts, context: RefinementContext): void {
   if (invoice.taxFacts.kind !== "foreign-currency-uk-vat") return;
 
-  const serviceLines = asTaxableNonEmpty(invoice.serviceLines);
+  const serviceLines = taxableServiceLines(invoice.serviceLines);
   if (!serviceLines) return;
 
   const errors = sterlingVatSummaryErrors({
@@ -435,10 +438,7 @@ function checkInvoiceIssueEvent(invoice: InvoiceFacts, context: RefinementContex
 }
 
 function latestPeriodEnd(invoice: InvoiceFacts): string {
-  return invoice.serviceLines.reduce(
-    (latest, line) => (line.periodEnd > latest ? line.periodEnd : latest),
-    invoice.serviceLines[0]?.periodEnd ?? "",
-  );
+  return summarizeServiceLines(invoice.serviceLines).periodEnd;
 }
 
 function isTaxableServiceLine(
@@ -447,12 +447,19 @@ function isTaxableServiceLine(
   return "vatRate" in serviceLine;
 }
 
-function asTaxableNonEmpty(
+function taxableServiceLines(
   serviceLines: InvoiceFacts["serviceLines"],
 ): NonEmptyReadonlyArray<ReviewedTaxableInvoiceServiceLine> | null {
-  if (!serviceLines.every(isTaxableServiceLine)) return null;
-  const [first, ...rest] = serviceLines;
-  return first ? [{ ...first }, ...rest.map((serviceLine) => ({ ...serviceLine }))] : null;
+  return areTaxableServiceLines(serviceLines) ? serviceLines : null;
+}
+
+function areTaxableServiceLines(
+  serviceLines: InvoiceFacts["serviceLines"],
+): serviceLines is InvoiceFacts["serviceLines"] &
+  NonEmptyReadonlyArray<
+    Extract<InvoiceFacts["serviceLines"][number], Readonly<{ vatRate: string }>>
+  > {
+  return serviceLines.every(isTaxableServiceLine);
 }
 
 function addLineIssue(
