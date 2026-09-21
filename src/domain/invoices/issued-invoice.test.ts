@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 
 import { persistedClientSchema } from "../clients/client.js";
 import { completeClient } from "../../../tests/fixtures/client.js";
@@ -13,9 +13,17 @@ import {
   attachRetainedInvoicePdf,
   createIssuedInvoiceSnapshot,
   persistedIssuedInvoiceSchema,
+  type IssuedInvoice,
 } from "./issued-invoice.js";
+import type { InvoiceServiceLine, NonEmptyReadonlyArray } from "./invoice-service-line.js";
 
 describe("issued outside-scope invoice", () => {
+  it("exposes immutable service lines as a non-empty collection", () => {
+    expectTypeOf<IssuedInvoice["serviceLines"]>().toExtend<
+      NonEmptyReadonlyArray<InvoiceServiceLine>
+    >();
+  });
+
   it("freezes the validated facts, issue event, and retained PDF identity", () => {
     const review = reviewInvoiceDraft({
       client: completeClient,

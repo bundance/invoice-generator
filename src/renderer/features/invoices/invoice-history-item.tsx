@@ -1,5 +1,6 @@
 import type { CreditNote } from "../../../domain/invoices/credit-note.ts";
 import type { IssuedInvoice } from "../../../domain/invoices/issued-invoice.ts";
+import { summarizeServiceLines } from "../../../domain/invoices/invoice-service-line.ts";
 import { formatCurrencyAmount } from "../../../domain/money/decimal.ts";
 import { formatSterlingVatSummary } from "../../../documents/exchange-presentation.ts";
 import { InvoiceVatFacts } from "../../ui/invoice-vat-facts.tsx";
@@ -23,17 +24,7 @@ export function InvoiceHistoryItem({ creditNote, invoice, onCorrect }: InvoiceHi
       : null,
     invoice.currency.code,
   );
-  const periodStart = invoice.serviceLines.reduce(
-    (earliest, line) => (line.periodStart < earliest ? line.periodStart : earliest),
-    invoice.serviceLines[0]?.periodStart ?? "",
-  );
-  const periodEnd = invoice.serviceLines.reduce(
-    (latest, line) => (line.periodEnd > latest ? line.periodEnd : latest),
-    invoice.serviceLines[0]?.periodEnd ?? "",
-  );
-  const vatRates = [
-    ...new Set(invoice.serviceLines.flatMap((line) => ("vatRate" in line ? [line.vatRate] : []))),
-  ];
+  const { periodEnd, periodStart, vatRates } = summarizeServiceLines(invoice.serviceLines);
 
   return (
     <article aria-label={`Invoice ${invoice.id}`} className="invoice-history-item">

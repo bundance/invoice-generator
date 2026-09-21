@@ -6,16 +6,28 @@ import type { ElectronApplication } from "playwright";
 
 import { initialWorkspaceState } from "../../src/application/workspace.js";
 import { persistedClientSchema } from "../../src/domain/clients/client.js";
-import { persistedInvoiceDraftSchema } from "../../src/domain/invoices/invoice-draft.js";
-import { persistedIssuedInvoiceSchema } from "../../src/domain/invoices/issued-invoice.js";
+import {
+  createInvoiceDraft,
+  persistedInvoiceDraftSchema,
+  reviewInvoiceDraft,
+} from "../../src/domain/invoices/invoice-draft.js";
+import {
+  attachRetainedCreditNotePdf,
+  createFullCreditNoteSnapshot,
+  reviewFullCreditNote,
+} from "../../src/domain/invoices/credit-note.js";
+import {
+  attachRetainedInvoicePdf,
+  createIssuedInvoiceSnapshot,
+} from "../../src/domain/invoices/issued-invoice.js";
 import { persistedIssuerSettingsSchema } from "../../src/domain/issuer/issuer-settings.js";
+import { parseBusinessDate } from "../../src/domain/time/business-date.js";
 import {
   parseWorkspaceState,
   serializeWorkspaceState,
 } from "../../src/infrastructure/persistence/workspace-state.js";
 import { createWorkspaceRepository } from "../../src/infrastructure/persistence/workspace-repository.js";
 import { completeClient } from "../fixtures/client.js";
-import { completeInvoiceDraftInput, completeIssuedInvoice } from "../fixtures/issued-invoice.js";
 import { completeIssuer } from "../fixtures/issuer-settings.js";
 import {
   closeApp,
@@ -73,8 +85,11 @@ test("Settings validates, cancels, and completes a whole-dataset restore before 
     await expect(dialog).toContainText("Archive schema 1");
     await expect(dialog).toContainText("Workspace schema 7");
     await expect(dialog).toContainText("1 client");
-    await expect(dialog).toContainText("1 invoice");
+    await expect(dialog).toContainText("2 invoices");
+    await expect(dialog).toContainText("1 credit note");
+    await expect(dialog).toContainText("CN-GGIOHK-0043.pdf");
     await expect(dialog).toContainText("GGIOHK-0043.pdf");
+    await expect(dialog).toContainText("GGIOHK-0044.pdf");
     await expect(dialog).toContainText("never merges records");
     await dialog.getByRole("button", { name: "Cancel restore" }).click();
     await expect(readFile(join(targetDataPath, "state.json"), "utf8")).resolves.toBe(targetState);
@@ -87,20 +102,43 @@ test("Settings validates, cancels, and completes a whole-dataset restore before 
     await expect(recoveryDialog).toBeVisible();
     expect(await readFile(join(targetDataPath, "state.json"), "utf8")).toBe(source.stateJson);
     const restoredPdfFiles = await readdir(join(targetDataPath, "retained-pdfs"));
-    expect(restoredPdfFiles).toEqual(["GGIOHK-0043.pdf"]);
-    await expect(
-      readFile(join(targetDataPath, "retained-pdfs", restoredPdfFiles[0] ?? "missing")),
-    ).resolves.toEqual(source.pdfBytes);
+    expect(restoredPdfFiles).toEqual(["CN-GGIOHK-0043.pdf", "GGIOHK-0043.pdf", "GGIOHK-0044.pdf"]);
+    for (const [filename, pdfBytes] of Object.entries(source.pdfBytesByFilename)) {
+      await expect(readFile(join(targetDataPath, "retained-pdfs", filename))).resolves.toEqual(
+        pdfBytes,
+      );
+    }
+    const restoredState = parseWorkspaceState(
+      await readFile(join(targetDataPath, "state.json"), "utf8"),
+    );
+    expect(
+      restoredState.draft?.draft.serviceLines.map(({ serviceDescription }) => serviceDescription),
+    ).toEqual(["Discovery and design", "Implementation and testing"]);
+    expect(
+      restoredState.issuedInvoices[0]?.serviceLines.map(
+        ({ serviceDescription }) => serviceDescription,
+      ),
+    ).toEqual(["Discovery and design", "Implementation and testing"]);
+    expect(
+      restoredState.creditNotes[0]?.serviceLines.map(
+        ({ serviceDescription }) => serviceDescription,
+      ),
+    ).toEqual(["Discovery and design", "Implementation and testing"]);
+    expect(restoredState.issuedInvoices[1]?.replacesInvoiceId).toBe("GGIOHK-0043");
 
     await recoveryDialog.getByRole("button", { name: "Resume draft" }).click();
     await targetPage.getByRole("button", { name: "Review and issue" }).click();
-    const issueDialog = targetPage.getByRole("dialog", { name: "Issue invoice GGIOHK-0044?" });
-    await issueDialog.getByRole("button", { name: "Issue GGIOHK-0044" }).click();
-    await expect(targetPage.getByRole("article", { name: "Invoice GGIOHK-0044" })).toBeVisible();
+    const issueDialog = targetPage.getByRole("dialog", { name: "Issue invoice GGIOHK-0045?" });
+    await issueDialog.getByRole("button", { name: "Issue GGIOHK-0045" }).click();
+    await expect(targetPage.getByRole("article", { name: "Invoice GGIOHK-0045" })).toBeVisible();
     const finalState = parseWorkspaceState(
       await readFile(join(targetDataPath, "state.json"), "utf8"),
     );
-    expect(finalState.issuedInvoices.map(({ id }) => id)).toEqual(["GGIOHK-0043", "GGIOHK-0044"]);
+    expect(finalState.issuedInvoices.map(({ id }) => id)).toEqual([
+      "GGIOHK-0043",
+      "GGIOHK-0044",
+      "GGIOHK-0045",
+    ]);
   } finally {
     await Promise.allSettled([closeApp(sourceApp), ...(targetApp ? [closeApp(targetApp)] : [])]);
   }
@@ -158,40 +196,139 @@ test("a committed restore relaunches the app when old PDF cleanup needs a restar
     );
     await expect(readdir(retainedPdfDirectory)).resolves.toContain("OLD-0001.pdf");
     await createWorkspaceRepository({ userDataPath: targetDataPath }).load();
-    await expect(readdir(retainedPdfDirectory)).resolves.toEqual(["GGIOHK-0043.pdf"]);
+    await expect(readdir(retainedPdfDirectory)).resolves.toEqual(
+      Object.keys(source.pdfBytesByFilename).sort(),
+    );
   } finally {
     await Promise.allSettled([closeApp(sourceApp), ...(targetApp ? [closeApp(targetApp)] : [])]);
   }
 });
 
 async function writeSourceDataset(userDataPath: string) {
-  const pdfBytes = Buffer.from("%PDF-1.7\nretained source invoice\n%%EOF");
-  const sha256 = createHash("sha256").update(pdfBytes).digest("hex");
-  const invoice = persistedIssuedInvoiceSchema.parse({
-    ...completeIssuedInvoice,
-    retainedPdf: { ...completeIssuedInvoice.retainedPdf, sha256 },
+  const originalClient = persistedClientSchema.parse({
+    ...completeClient,
+    invoiceSequence: { ...completeClient.invoiceSequence, nextNumber: "43" },
+  });
+  const originalDraft = createInvoiceDraft(originalClient);
+  if (originalDraft.vatTreatment !== "outside-scope") {
+    throw new Error("Expected an outside-scope backup fixture");
+  }
+  const serviceLines = [
+    {
+      ...originalDraft.serviceLines[0],
+      billableDays: "2",
+      periodEnd: "2026-09-02",
+      periodStart: "2026-09-01",
+      serviceDescription: "Discovery and design",
+    },
+    {
+      ...originalDraft.serviceLines[0],
+      billableDays: "2",
+      periodEnd: "2026-09-04",
+      periodStart: "2026-09-03",
+      serviceDescription: "Implementation and testing",
+    },
+  ] as const;
+  const originalReview = reviewInvoiceDraft({
+    client: originalClient,
+    draft: { ...originalDraft, issueDate: "2026-09-04", serviceLines },
+    issuer: completeIssuer,
+    today: parseBusinessDate("2026-09-04"),
+  });
+  if (!originalReview.candidate) throw new Error("Expected a valid original invoice fixture");
+  const originalPdf = createRetainedPdf("GGIOHK-0043.pdf", "original invoice");
+  const originalInvoice = attachRetainedInvoicePdf({
+    pdf: originalPdf.reference,
+    snapshot: createIssuedInvoiceSnapshot({
+      candidate: originalReview.candidate,
+      invoiceNumber: "43",
+      issuedAt: "2026-09-04T10:11:12.000Z",
+      lateIssueDateAcknowledged: false,
+    }),
+  });
+  const creditReview = reviewFullCreditNote({
+    input: {
+      issueDate: "2026-09-07",
+      originalInvoiceId: originalInvoice.id,
+      reason: "The billed service period was incorrect.",
+    },
+    invoice: originalInvoice,
+    today: parseBusinessDate("2026-09-07"),
+  });
+  if (creditReview.kind !== "ready") throw new Error("Expected a valid credit-note fixture");
+  const creditPdf = createRetainedPdf("CN-GGIOHK-0043.pdf", "full credit note");
+  const creditNote = attachRetainedCreditNotePdf({
+    pdf: creditPdf.reference,
+    snapshot: createFullCreditNoteSnapshot({
+      candidate: creditReview.candidate,
+      issuedAt: "2026-09-07T10:11:12.000Z",
+    }),
+  });
+  const replacementClient = persistedClientSchema.parse({
+    ...completeClient,
+    invoiceSequence: { ...completeClient.invoiceSequence, nextNumber: "44" },
+  });
+  const replacementReview = reviewInvoiceDraft({
+    client: replacementClient,
+    draft: { ...originalDraft, issueDate: "2026-09-08", serviceLines },
+    issuer: completeIssuer,
+    today: parseBusinessDate("2026-09-08"),
+  });
+  if (!replacementReview.candidate) throw new Error("Expected a valid replacement fixture");
+  const replacementPdf = createRetainedPdf("GGIOHK-0044.pdf", "replacement invoice");
+  const replacementInvoice = attachRetainedInvoicePdf({
+    pdf: replacementPdf.reference,
+    snapshot: createIssuedInvoiceSnapshot({
+      candidate: replacementReview.candidate,
+      invoiceNumber: "44",
+      issuedAt: "2026-09-08T10:11:12.000Z",
+      lateIssueDateAcknowledged: false,
+      replacesInvoiceId: originalInvoice.id,
+    }),
+  });
+  const savedClient = persistedClientSchema.parse({
+    ...completeClient,
+    invoiceSequence: { ...completeClient.invoiceSequence, nextNumber: "45" },
   });
   const stateJson = serializeWorkspaceState({
     ...initialWorkspaceState,
-    clients: [
-      persistedClientSchema.parse({
-        ...completeClient,
-        invoiceSequence: { ...completeClient.invoiceSequence, nextNumber: "44" },
-      }),
-    ],
+    clients: [savedClient],
+    creditNotes: [creditNote],
     draft: {
       kind: "ordinary",
-      draft: persistedInvoiceDraftSchema.parse(completeInvoiceDraftInput),
+      draft: persistedInvoiceDraftSchema.parse({
+        ...originalDraft,
+        issueDate: "2026-09-09",
+        serviceLines,
+      }),
     },
-    issuedInvoices: [invoice],
+    issuedInvoices: [originalInvoice, replacementInvoice],
     issuer: completeIssuer,
   });
   await mkdir(join(userDataPath, "retained-pdfs"), { mode: 0o700 });
+  const pdfBytesByFilename = {
+    [creditNote.retainedPdf.filename]: creditPdf.bytes,
+    [originalInvoice.retainedPdf.filename]: originalPdf.bytes,
+    [replacementInvoice.retainedPdf.filename]: replacementPdf.bytes,
+  };
   await Promise.all([
     writeFile(join(userDataPath, "state.json"), stateJson),
-    writeFile(join(userDataPath, "retained-pdfs", invoice.retainedPdf.filename), pdfBytes),
+    ...Object.entries(pdfBytesByFilename).map(([filename, pdfBytes]) =>
+      writeFile(join(userDataPath, "retained-pdfs", filename), pdfBytes),
+    ),
   ]);
-  return { pdfBytes, stateJson };
+  return { pdfBytesByFilename, stateJson };
+}
+
+function createRetainedPdf(filename: string, label: string) {
+  const bytes = Buffer.from(`%PDF-1.7\nretained ${label}\n%%EOF`);
+  return {
+    bytes,
+    reference: {
+      filename,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    },
+  };
 }
 
 async function selectRestorePath(

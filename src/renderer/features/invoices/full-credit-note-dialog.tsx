@@ -1,6 +1,7 @@
 import { useRef } from "react";
 
 import type { FullCreditNoteCandidate } from "../../../domain/invoices/credit-note.ts";
+import { summarizeServiceLines } from "../../../domain/invoices/invoice-service-line.ts";
 import { formatCurrencyAmount } from "../../../domain/money/decimal.ts";
 import { ModalDialog } from "../../ui/modal-dialog.tsx";
 import { formatVatTreatment } from "../../ui/vat-treatment-presentation.ts";
@@ -25,9 +26,7 @@ export function FullCreditNoteDialog({
     candidate.currency.minorUnit,
   );
   const { vatTreatment } = candidate.taxFacts;
-  const vatRates = [
-    ...new Set(candidate.serviceLines.flatMap((line) => ("vatRate" in line ? [line.vatRate] : []))),
-  ];
+  const { vatRates } = summarizeServiceLines(candidate.serviceLines);
 
   return (
     <ModalDialog

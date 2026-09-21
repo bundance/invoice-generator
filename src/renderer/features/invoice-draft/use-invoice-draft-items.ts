@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useFieldArray } from "react-hook-form";
 
 import type { Client } from "../../../domain/clients/client.ts";
+import { createInvoiceServiceLineInput } from "../../../domain/invoices/invoice-draft.ts";
 import type { InvoiceDraftForm } from "./use-invoice-draft-form.ts";
 
 type UseInvoiceDraftItemsOptions = Readonly<{
@@ -32,29 +33,10 @@ export function useInvoiceDraftItems({ draftForm, selectedClient }: UseInvoiceDr
   }, [activeFieldId, fields]);
 
   function addItem(): void {
+    if (!selectedClient) return;
     const draft = draftForm.getValues();
-    const firstLine = draft.serviceLines[0];
-    const commonLine = {
-      billableDays: "",
-      dayRate: selectedClient?.standardDayRate ?? firstLine.dayRate,
-      periodEnd: "",
-      periodStart: "",
-      serviceDescription: selectedClient?.defaultServiceDescription ?? firstLine.serviceDescription,
-    };
-    const line =
-      draft.vatTreatment === "uk-taxable"
-        ? {
-            ...commonLine,
-            vatRate:
-              selectedClient?.vatTreatment.kind === "uk-taxable"
-                ? selectedClient.vatTreatment.rate
-                : "vatRate" in firstLine
-                  ? firstLine.vatRate
-                  : "",
-          }
-        : commonLine;
     pendingOpenIndex.current = fields.length;
-    append(line);
+    append(createInvoiceServiceLineInput(selectedClient, draft));
   }
 
   function duplicateItem(index: number): void {
