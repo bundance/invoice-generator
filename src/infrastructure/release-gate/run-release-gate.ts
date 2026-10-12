@@ -15,10 +15,11 @@ await mkdir(testResultsDirectory, { recursive: true });
 
 for (const stage of releaseStages) {
   process.stdout.write(`\nSTART ${stage.id}: ${stage.name}\n`);
+  // Interactive terminal input can suspend stages launched through timeout wrappers.
   const result = spawnSync(stage.command, {
-    env: process.env,
+    env: { ...process.env, CI: "true" },
     shell: true,
-    stdio: "inherit",
+    stdio: ["ignore", "inherit", "inherit"],
   });
   if (result.status !== 0) {
     throw new Error(

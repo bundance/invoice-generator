@@ -18,6 +18,8 @@ Package scripts use the Node.js version in [`.node-version`](../../.node-version
 
 The full gate is the authoritative result. Its stages and time limits live in [`release-plan.ts`](../../src/infrastructure/release-gate/release-plan.ts). It runs quality checks, unit and component tests, the production build, Electron journeys, PDF checks, arm64 DMG packaging, and package inspection.
 
+The release runner always starts stages in batch mode with `CI=true` and no standard input. Output remains visible in the terminal. This prevents interactive tools such as React Doctor from suspending under the stage timeout wrappers; callers do not need extra environment variables or input redirection.
+
 ## Electron permission boundary
 
 Run the full gate with normal macOS GUI process access, outside a restricted command sandbox. Electron launch can abort with `EPERM` or `SIGABRT` in a sandbox, and the evidence check may then report a secondary error about a missing screenshot. That is an execution-environment failure, not proof of an application defect.
