@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { access, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -865,6 +866,78 @@ test("the production renderer detects issuer text clipped inside the document he
   }
 });
 
+for (const client of [completeClient, completeGbpVatClient]) {
+  test(`a ${client.currency.code} ${client.vatTreatment.kind} credit note fits a wrapped monthly-invoice correction reason`, async ({
+    browserName: _browserName,
+  }, testInfo) => {
+    const reason =
+      "A monthly invoice is needed, rather than a weekly one. This invoice was moved to ICRONI-005 with the other month's invoices.";
+    const userDataPath = await createUserDataPath("credit-note-wrapped-reason");
+    await writeFile(
+      join(userDataPath, "state.json"),
+      serializeWorkspaceState({
+        ...initialWorkspaceState,
+        clients: [client],
+        issuer: completeIssuer,
+      }),
+    );
+    const electronApp = await launchProductionApp(userDataPath);
+
+    try {
+      const page = await electronApp.firstWindow();
+      await page.getByRole("tab", { name: "Work" }).click();
+      await page.getByLabel("Period start").fill("2026-09-01");
+      await page.getByLabel("Period end").fill("2026-09-04");
+      await page.getByLabel("Billable days").fill("4");
+      await page.getByRole("tab", { name: "Tax & issue" }).click();
+      await page.getByLabel("Issue date").fill("2026-09-04");
+      await expect(page.getByText("Saved on this Mac")).toBeVisible();
+      await page.getByRole("button", { name: "Review and issue" }).click();
+      const issueDialog = page.getByRole("dialog", { name: /^Issue invoice /u });
+      await issueDialog.getByRole("button", { name: /^Issue /u }).click();
+      await expect(page.getByRole("button", { name: /^Correct /u })).toBeVisible();
+      const issuedWorkspace = await readWorkspaceState(userDataPath);
+      const invoice = issuedWorkspace.issuedInvoices[0];
+      if (!invoice) throw new Error("Expected an issued invoice to correct");
+      const invoicePdfPath = join(userDataPath, "retained-pdfs", invoice.retainedPdf.filename);
+      const originalPdfBytes = await readFile(invoicePdfPath);
+      await page.getByRole("button", { name: `Correct ${invoice.id}` }).click();
+      await page.getByLabel("Correction reason").fill(reason);
+      await page.getByLabel("Credit-note issue date").fill("2026-10-14");
+      await expectPreviewFits(page.getByLabel("Credit note preview"));
+      await page.getByRole("button", { name: "Review and issue credit note" }).click();
+      const dialog = page.getByRole("dialog", { name: `Issue credit note CN-${invoice.id}?` });
+      await dialog.getByRole("button", { name: `Issue CN-${invoice.id}` }).click();
+      await expect(page.getByText("The original is fully credited.")).toBeVisible();
+
+      const creditedWorkspace = await readWorkspaceState(userDataPath);
+      expect(creditedWorkspace.issuedInvoices).toEqual(issuedWorkspace.issuedInvoices);
+      expect(creditedWorkspace.creditNotes).toHaveLength(1);
+      const creditNote = creditedWorkspace.creditNotes[0];
+      if (!creditNote) throw new Error("Expected the issued credit note");
+      expect(creditNote.reason).toBe(reason);
+      await expect(readFile(invoicePdfPath)).resolves.toEqual(originalPdfBytes);
+      const creditNotePdfPath = join(
+        userDataPath,
+        "retained-pdfs",
+        creditNote.retainedPdf.filename,
+      );
+      await verifyRetainedInvoicePdf({
+        pdfPath: creditNotePdfPath,
+        requiredText: [`References invoice ${invoice.id}`],
+        workingDirectory: testInfo.outputPath("wrapped-reason-credit-note"),
+      });
+      const creditNoteText = execFileSync("pdftotext", ["-layout", creditNotePdfPath, "-"], {
+        encoding: "utf8",
+        timeout: 30_000,
+      });
+      expect(creditNoteText.replace(/\s+/gu, " ")).toContain(reason);
+    } finally {
+      await closeApp(electronApp);
+    }
+  });
+}
+
 test("the production renderer blocks a full credit note whose reason exceeds its fixed region", async () => {
   const userDataPath = await createUserDataPath("credit-note-overflow");
   await writeFile(
@@ -950,7 +1023,8 @@ async function expectPreviewFits(preview: Locator): Promise<void> {
   const rawMeasurements: unknown = await preview.evaluate(collectBillingDocumentMeasurements);
   const measurements = billingDocumentMeasurementsSchema.parse(rawMeasurements);
   const fit = evaluateBillingDocumentFit(measurements);
-  expect(fit.failures, JSON.stringify(fit.page)).toEqual([]);
+  const failedRegions = fit.regions.filter((region) => fit.failures.includes(region.name));
+  expect(fit.failures, JSON.stringify({ page: fit.page, failedRegions })).toEqual([]);
 }
 
 async function readWorkspaceState(userDataPath: string): Promise<WorkspaceState> {

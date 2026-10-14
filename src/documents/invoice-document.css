@@ -53,7 +53,7 @@
     "credit-link" 14mm
     "." 3mm
     "table" auto
-    "credit-reason" 12mm
+    "credit-reason" max-content
     "notes" 20mm
     "." 3mm
     "footer" auto / 1fr;
@@ -68,7 +68,7 @@
     "credit-link" 14mm
     "." 3mm
     "table" auto
-    "credit-reason" 12mm
+    "credit-reason" max-content
     "." 20px
     "sterling-vat" auto
     "notes" 15mm
@@ -182,7 +182,8 @@
 
 .credit-note-reason {
   grid-area: credit-reason;
-  height: 12mm;
+  min-height: 12mm;
+  max-height: 30mm;
   padding-top: 3mm;
   white-space: pre-line;
 }
