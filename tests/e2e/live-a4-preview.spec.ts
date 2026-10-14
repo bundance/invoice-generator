@@ -160,6 +160,18 @@ test("live invoice and credit-note previews fit the available production workspa
       throw new Error("Expected visible credit-note workspace columns");
     expect(Math.abs(controlsBox.y - previewBox.y)).toBeLessThanOrEqual(1);
     expect(previewBox.x).toBeGreaterThan(controlsBox.x + controlsBox.width);
+    const [reasonLabelBox, reasonBox, reasonHelpBox, issueDateBox] = await Promise.all([
+      controls.getByText("Correction reason", { exact: true }).boundingBox(),
+      controls.getByLabel("Correction reason").boundingBox(),
+      controls.getByText("Bad debt is not a correction reason.").boundingBox(),
+      controls.getByLabel("Credit-note issue date").boundingBox(),
+    ]);
+    if (!reasonLabelBox || !reasonBox || !reasonHelpBox || !issueDateBox)
+      throw new Error("Expected visible credit-note form fields");
+    expect(reasonLabelBox.y + reasonLabelBox.height).toBeLessThan(reasonBox.y);
+    expect(reasonHelpBox.y).toBeGreaterThan(reasonBox.y + reasonBox.height);
+    expect(Math.abs(reasonBox.width - controlsBox.width)).toBeLessThanOrEqual(1);
+    expect(Math.abs(issueDateBox.width - controlsBox.width)).toBeLessThanOrEqual(1);
     await expectFittedA4Page(creditNotePreview);
     await expectToolbarFits(creditNotePreview);
 
