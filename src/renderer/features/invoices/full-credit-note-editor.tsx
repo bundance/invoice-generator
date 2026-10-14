@@ -1,3 +1,5 @@
+import type { ChangeEvent } from "react";
+
 import type { FullCreditNoteInput } from "../../../domain/invoices/credit-note.ts";
 import { reviewFullCreditNote } from "../../../domain/invoices/credit-note.ts";
 import type { IssuedInvoice } from "../../../domain/invoices/issued-invoice.ts";
@@ -29,6 +31,13 @@ export function FullCreditNoteEditor({
   onReasonChange,
 }: FullCreditNoteEditorProps) {
   const previewReview = reviewFullCreditNote({ input, invoice, today: currentBusinessDate });
+  const updateReason = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    onReasonChange(event.target.value);
+  };
+  const updateIssueDate = (event: ChangeEvent<HTMLInputElement>) => {
+    onIssueDateChange(event.target.value);
+  };
+
   return (
     <BillingDocumentFontGate fonts={billingDocumentFonts}>
       {(fontReadiness) => (
@@ -54,28 +63,32 @@ export function FullCreditNoteEditor({
                 <p>{invoice.client.legalName}</p>
                 <RetainedDocumentActions documentId={invoice.id} />
               </article>
-              <label className="field" htmlFor="credit-note-reason">
-                <span>Correction reason</span>
+              <div className="settings-field">
+                <label className="field-label" htmlFor="credit-note-reason">
+                  Correction reason
+                </label>
                 <textarea
-                  aria-label="Correction reason"
+                  aria-describedby="credit-note-reason-help"
                   id="credit-note-reason"
-                  onChange={(event) => onReasonChange(event.target.value)}
+                  onChange={updateReason}
                   rows={4}
                   value={input.reason}
                 />
-                <small>Bad debt is not a correction reason.</small>
-              </label>
-              <label className="field" htmlFor="credit-note-issue-date">
-                <span>Credit-note issue date</span>
+                <small id="credit-note-reason-help">Bad debt is not a correction reason.</small>
+              </div>
+              <div className="settings-field">
+                <label className="field-label" htmlFor="credit-note-issue-date">
+                  Credit-note issue date
+                </label>
                 <input
                   id="credit-note-issue-date"
                   max={currentBusinessDate}
                   min={invoice.issue.date}
-                  onChange={(event) => onIssueDateChange(event.target.value)}
+                  onChange={updateIssueDate}
                   type="date"
                   value={input.issueDate}
                 />
-              </label>
+              </div>
               <p className="validation-warning">
                 This reverses the whole invoice. Partial credits are not supported.
               </p>
