@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
@@ -19,7 +19,8 @@ import {
   emptyWorkspace,
   makeOtherClient,
   replaceField,
-  unusedInvoiceAppCommands,
+  renderAppForTest,
+  testInvoiceAppCommands,
 } from "../../app/app-test-support.ts";
 
 describe("client management", () => {
@@ -28,17 +29,17 @@ describe("client management", () => {
   it("creates the first client from the empty state and leaves invoices blocked on issuer setup", async () => {
     const createdInputs: ClientInput[] = [];
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       createClient: (input) => {
         createdInputs.push(input);
         return Promise.resolve({ kind: "saved", client: completeClient });
       },
       loadWorkspace: () => Promise.resolve(emptyWorkspace),
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
-      updateClient: unusedInvoiceAppCommands.updateClient,
+      updateClient: testInvoiceAppCommands.updateClient,
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Clients" }));
     await user.click(screen.getByRole("button", { name: "Create first client" }));
@@ -62,7 +63,7 @@ describe("client management", () => {
 
   it("shows only the missing setup requirement before creating an invoice", async () => {
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -79,7 +80,7 @@ describe("client management", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     expect(await screen.findByText("First client")).toBeVisible();
     expect(screen.getByRole("button", { name: "Create first client" })).toBeVisible();
@@ -96,7 +97,7 @@ describe("client management", () => {
       standardVatRate: "17.5",
     });
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -113,7 +114,7 @@ describe("client management", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Clients" }));
     await user.click(screen.getByRole("button", { name: "Create first client" }));
@@ -123,7 +124,7 @@ describe("client management", () => {
 
   it("makes client defaults available only when issuer and client setup are complete", async () => {
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -139,7 +140,7 @@ describe("client management", () => {
         }),
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
-    render(<App />);
+    renderAppForTest(<App />);
 
     expect(await screen.findByRole("combobox", { name: "Client" })).toHaveValue(completeClient.id);
     expect(screen.getByText("Draft defaults ready for Genesis Global.")).toBeVisible();
@@ -151,8 +152,8 @@ describe("client management", () => {
     const otherClient = makeOtherClient();
     const updatedInputs: Array<Readonly<{ id: string; input: ClientInput }>> = [];
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
-      createClient: unusedInvoiceAppCommands.createClient,
+      ...testInvoiceAppCommands,
+      createClient: testInvoiceAppCommands.createClient,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -181,7 +182,7 @@ describe("client management", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Clients" }));
     await user.click(screen.getByRole("button", { name: /Genesis Global/ }));
@@ -225,7 +226,7 @@ describe("client management", () => {
       invoiceSequence: { ...completeClient.invoiceSequence, nextNumber: "44" },
     });
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       createClient: (input) => {
         createdInputs.push(input);
         return Promise.resolve({
@@ -253,10 +254,10 @@ describe("client management", () => {
           },
         }),
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
-      updateClient: unusedInvoiceAppCommands.updateClient,
+      updateClient: testInvoiceAppCommands.updateClient,
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Clients" }));
     expect(
@@ -295,7 +296,7 @@ describe("client management", () => {
     let saveShouldFail = true;
     const submittedInputs: ClientInput[] = [];
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       createClient: (input) => {
         submittedInputs.push(input);
         return Promise.resolve(
@@ -306,10 +307,10 @@ describe("client management", () => {
       },
       loadWorkspace: () => Promise.resolve(emptyWorkspace),
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
-      updateClient: unusedInvoiceAppCommands.updateClient,
+      updateClient: testInvoiceAppCommands.updateClient,
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Clients" }));
     await user.click(screen.getByRole("button", { name: "Create first client" }));
@@ -335,8 +336,8 @@ describe("client management", () => {
     const firstSave = deferred<ClientSaveResult>();
     const submittedInputs: ClientInput[] = [];
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
-      createClient: unusedInvoiceAppCommands.createClient,
+      ...testInvoiceAppCommands,
+      createClient: testInvoiceAppCommands.createClient,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -364,7 +365,7 @@ describe("client management", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Clients" }));
     await user.click(screen.getByRole("button", { name: /Genesis Global/ }));

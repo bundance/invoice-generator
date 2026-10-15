@@ -40,6 +40,7 @@ import type {
   InvoiceIssueResult,
   InvoiceIssueReviewResult,
   IssuerSettingsSaveResult,
+  PdfPreviewResult,
   RestoreInspectionResult,
   RestoreResult,
   ReplacementDraftCreateResult,
@@ -80,6 +81,8 @@ export type InvoiceApplication = Readonly<{
   issueFullCreditNote: (input: FullCreditNoteIssueInput) => Promise<FullCreditNoteIssueResult>;
   issueInvoice: (input: InvoiceIssueInput) => Promise<InvoiceIssueResult>;
   loadWorkspace: () => Promise<WorkspaceLoadResult>;
+  previewInvoiceDraft: (input: InvoiceDraftInput) => Promise<PdfPreviewResult>;
+  previewFullCreditNote: (input: FullCreditNoteInput) => Promise<PdfPreviewResult>;
   inspectRestoreBackup: () => Promise<RestoreInspectionResult>;
   restoreBackup: (restoreId: RestoreId) => Promise<RestoreResult>;
   reviewInvoiceIssue: (input: InvoiceDraftInput) => Promise<InvoiceIssueReviewResult>;
@@ -342,6 +345,40 @@ export async function openInvoiceApplication({
     return fullCreditNotes.review(applicationState.workspace, input);
   }
 
+  async function previewInvoiceDraft(input: InvoiceDraftInput): Promise<PdfPreviewResult> {
+    await pendingMutation;
+    if (applicationState.kind === "recovery-required") {
+      return { kind: "failed", message: "The local workspace is unavailable." };
+    }
+    const workspace = applicationState.workspace;
+    if (!workspace.issuer) {
+      return { kind: "invalid", message: "Complete company settings to preview an invoice." };
+    }
+    const client = workspace.clients.find(({ id }) => id === input.clientId);
+    const review = reviewInvoiceDraft({
+      client,
+      draft: input,
+      issuer: workspace.issuer,
+      today: currentBusinessDate(workspace.issuer.businessTimezone),
+    });
+    try {
+      return {
+        kind: "ready",
+        preview: await invoicePdf.previewDraft(workspace.issuer, review),
+      };
+    } catch {
+      return { kind: "failed", message: "Could not prepare the invoice preview." };
+    }
+  }
+
+  async function previewFullCreditNote(input: FullCreditNoteInput): Promise<PdfPreviewResult> {
+    await pendingMutation;
+    if (applicationState.kind === "recovery-required") {
+      return { kind: "failed", message: "The local workspace is unavailable." };
+    }
+    return fullCreditNotes.preview(applicationState.workspace, input);
+  }
+
   function issueFullCreditNote(
     input: FullCreditNoteIssueInput,
   ): Promise<FullCreditNoteIssueResult> {
@@ -501,6 +538,8 @@ export async function openInvoiceApplication({
     issueInvoice,
     loadWorkspace,
     inspectRestoreBackup,
+    previewFullCreditNote,
+    previewInvoiceDraft,
     reviewFullCreditNote,
     reviewInvoiceIssue,
     replaceDraftWithReplacement,

@@ -1,22 +1,22 @@
-import type { FullCreditNoteCandidate } from "../../../domain/invoices/credit-note.ts";
-import { BillingDocument } from "../../../documents/invoice-document.tsx";
-import { createCreditNoteDocumentModel } from "../../../documents/invoice-document-model.ts";
-import type { BillingDocumentFontReadiness } from "../../ui/billing-document-font-gate.tsx";
-import { LiveA4PreviewFrame } from "../../ui/live-a4-preview-frame.tsx";
+import type { FullCreditNoteInput } from "../../../domain/invoices/credit-note.ts";
+import {
+  BillingPdfPreview,
+  type BillingPdfPreviewReadiness,
+} from "../../ui/billing-pdf-preview.tsx";
 
 type CreditNotePreviewProps = Readonly<{
-  candidate: FullCreditNoteCandidate;
-  fontReadiness: BillingDocumentFontReadiness;
+  input: FullCreditNoteInput;
+  onReadyChange: (readiness: BillingPdfPreviewReadiness) => void;
+  requestKey: string;
 }>;
 
-export function CreditNotePreview({ candidate, fontReadiness }: CreditNotePreviewProps) {
+export function CreditNotePreview({ input, onReadyChange, requestKey }: CreditNotePreviewProps) {
   return (
-    <LiveA4PreviewFrame
+    <BillingPdfPreview
       ariaLabel="Credit note preview"
-      documentId={candidate.id}
-      fontReadiness={fontReadiness}
-    >
-      <BillingDocument embedFonts={false} model={createCreditNoteDocumentModel(candidate)} />
-    </LiveA4PreviewFrame>
+      onReadyChange={onReadyChange}
+      request={{ input, kind: "credit-note" }}
+      requestKey={requestKey}
+    />
   );
 }

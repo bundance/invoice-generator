@@ -60,9 +60,12 @@ test("invoice editor resizes by mouse and keyboard without clipping its controls
     expect(endBox.y).toBeGreaterThan(startBox.y + startBox.height);
     expect(endBox.x).toBeCloseTo(startBox.x, 0);
     await expectControlsFit(editor);
-    await expect
-      .poll(() => page.getByLabel("Invoice preview").getAttribute("data-font-status"))
-      .toBe("ready");
+    const preview = page.getByLabel("Invoice preview");
+    await expect(preview.locator(".billing-pdf-preview__page canvas").first()).toBeVisible();
+    await expect(preview.locator(".textLayer span").filter({ hasText: /^5$/u })).toHaveCount(1);
+    await expect(
+      preview.locator(".textLayer span").filter({ hasText: "DRAFT INVOICE" }),
+    ).toBeVisible();
 
     await electronApp.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0]?.setSize(1040, 680);

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
@@ -18,47 +18,28 @@ import {
 import { completeClient, completeGbpVatClient } from "../../../../tests/fixtures/client.ts";
 import { completeIssuedInvoice } from "../../../../tests/fixtures/issued-invoice.ts";
 import { completeIssuer } from "../../../../tests/fixtures/issuer-settings.ts";
-import {
-  createLoadedTestDocumentFonts,
-  createTestDocumentFonts,
-  setTestDocumentFonts,
-} from "../../../../tests/fixtures/test-document-fonts.ts";
 import App from "../../app/app.tsx";
 import {
   businessDate,
   deferred,
   makeOtherClient,
   replaceField,
-  unusedInvoiceAppCommands,
+  renderAppForTest,
+  testInvoiceAppCommands,
 } from "../../app/app-test-support.ts";
 
 describe("outside-scope invoice draft", () => {
-  afterEach(() => {
-    cleanup();
-    setTestDocumentFonts(createLoadedTestDocumentFonts());
-  });
+  afterEach(cleanup);
 
-  it("keeps invoice review unavailable until the visible preview fonts are ready", async () => {
-    const fontLoad = deferred<void>();
-    setTestDocumentFonts(
-      createTestDocumentFonts({
-        load: async (face) => {
-          await fontLoad.promise;
-          face.status = "loaded";
-        },
-        status: "unloaded",
-      }),
-    );
+  it("keeps invoice review unavailable until the generated PDF is rendered", async () => {
     window.invoiceApp = readyDraftBridge();
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await user.type(screen.getByLabelText("Notes"), "Work in progress");
     expect(screen.getByRole("button", { name: "Review and issue" })).toBeDisabled();
-    expect(screen.getByText("Preparing document fonts…")).toBeVisible();
-
-    fontLoad.resolve();
+    expect(screen.getByText("Preparing generated PDF…")).toBeVisible();
 
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Review and issue" })).toBeEnabled(),
@@ -66,10 +47,10 @@ describe("outside-scope invoice draft", () => {
     expect(screen.getByLabelText("Notes")).toHaveValue("Work in progress");
   });
 
-  it("autosaves editable client defaults and previews exact draft totals", async () => {
+  it("autosaves editable client defaults while refreshing the generated PDF", async () => {
     const savedDrafts: InvoiceDraftInput[] = [];
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -90,7 +71,7 @@ describe("outside-scope invoice draft", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     expect(await screen.findByRole("combobox", { name: "Client" })).toHaveValue(completeClient.id);
     expect(screen.getByLabelText("Client legal name")).toHaveValue(completeClient.legalName);
@@ -99,17 +80,12 @@ describe("outside-scope invoice draft", () => {
       completeClient.defaultServiceDescription,
     );
     expect(screen.getByLabelText("Day rate")).toHaveValue("725");
-    expect(within(screen.getByLabelText("Invoice preview")).getByText("USD 725.00")).toBeVisible();
-    expect(screen.getByLabelText("Invoice preview")).toHaveTextContent("HSBC");
-    expect(screen.getByLabelText("Invoice preview")).toHaveTextContent("40-38-04");
+    expect(await screen.findByLabelText("Rendered PDF pages")).toBeVisible();
 
     await replaceField(user, "Period start", "2026-09-01");
     await replaceField(user, "Period end", "2026-09-05");
     await replaceField(user, "Billable days", "5");
     expect(screen.getByText("Saving")).toBeVisible();
-    expect(
-      within(screen.getByLabelText("Invoice preview")).getAllByText("USD 3,625.00"),
-    ).not.toHaveLength(0);
     expect(screen.getByRole("button", { name: /React Native consultancy/ })).toHaveTextContent(
       "USD 3,625.00",
     );
@@ -139,7 +115,7 @@ describe("outside-scope invoice draft", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     expect(screen.getByRole("button", { name: "Delete item 1" })).toBeDisabled();
@@ -195,7 +171,7 @@ describe("outside-scope invoice draft", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await user.type(screen.getByLabelText("Notes"), "Keep this local edit");
@@ -222,7 +198,7 @@ describe("outside-scope invoice draft", () => {
       notes: "Recovered notes",
     });
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -250,7 +226,7 @@ describe("outside-scope invoice draft", () => {
         }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     const recoveryDialog = await screen.findByRole("dialog", {
       name: "Resume your invoice draft?",
@@ -282,16 +258,16 @@ describe("outside-scope invoice draft", () => {
   it("shows field and summary errors, keeps review available, and treats a late issue date as a warning", async () => {
     window.invoiceApp = readyDraftBridge();
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await replaceField(user, "Day rate", "not-a-number");
     await user.tab();
     expect(screen.getByText("Enter a positive amount.")).toBeVisible();
-    expect(
-      within(screen.getByLabelText("Invoice preview")).getAllByText("Unavailable"),
-    ).not.toHaveLength(0);
-    expect(screen.getByRole("button", { name: "Review and issue" })).toBeEnabled();
+    await screen.findByLabelText("Rendered PDF pages");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Review and issue" })).toBeEnabled(),
+    );
 
     await replaceField(user, "Period start", "2026-09-04");
     await replaceField(user, "Period end", "2026-09-04");
@@ -300,6 +276,7 @@ describe("outside-scope invoice draft", () => {
     await replaceField(user, "Issue date", "2026-09-04");
     await user.click(screen.getByRole("tab", { name: "Work" }));
 
+    await waitForGeneratedPdfPreview();
     await user.click(screen.getByRole("button", { name: "Review and issue" }));
     const summary = screen.getByRole("alert");
     expect(within(summary).getByText(/Fix \d+ detail/)).toBeVisible();
@@ -316,6 +293,7 @@ describe("outside-scope invoice draft", () => {
     await replaceField(user, "Day rate", "725");
     await user.click(screen.getByRole("tab", { name: "Tax & issue" }));
     await replaceField(user, "Issue date", "2026-09-04");
+    await waitForGeneratedPdfPreview();
     await user.click(screen.getByRole("button", { name: "Review and issue" }));
 
     expect(
@@ -364,7 +342,7 @@ describe("outside-scope invoice draft", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await replaceField(user, "Period start", "2026-09-01");
@@ -372,6 +350,7 @@ describe("outside-scope invoice draft", () => {
     await replaceField(user, "Billable days", "4");
     await user.click(screen.getByRole("tab", { name: "Tax & issue" }));
     await replaceField(user, "Issue date", "2026-09-04");
+    await waitForGeneratedPdfPreview();
     const trigger = screen.getByRole("button", { name: "Review and issue" });
     await user.click(trigger);
 
@@ -412,7 +391,7 @@ describe("outside-scope invoice draft", () => {
       reviewInvoiceIssue: () => pendingReview.promise,
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await replaceField(user, "Period start", "2026-09-01");
@@ -420,6 +399,7 @@ describe("outside-scope invoice draft", () => {
     await replaceField(user, "Billable days", "4");
     await user.click(screen.getByRole("tab", { name: "Tax & issue" }));
     await replaceField(user, "Issue date", "2026-09-04");
+    await waitForGeneratedPdfPreview();
     await user.click(screen.getByRole("button", { name: "Review and issue" }));
 
     await user.click(screen.getByRole("tab", { name: "Work" }));
@@ -486,7 +466,7 @@ describe("outside-scope invoice draft", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await replaceField(user, "Period start", "2026-09-01");
@@ -499,6 +479,7 @@ describe("outside-scope invoice draft", () => {
 
     await user.click(screen.getByRole("tab", { name: "Work" }));
     await user.type(screen.getByLabelText("Notes"), "Latest note");
+    await waitForGeneratedPdfPreview();
     await user.click(screen.getByRole("button", { name: "Review and issue" }));
     const dialog = await screen.findByRole("dialog", { name: "Issue invoice GGIOHK-0043?" });
     await user.click(within(dialog).getByRole("button", { name: "Issue GGIOHK-0043" }));
@@ -530,7 +511,7 @@ describe("outside-scope invoice draft", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await replaceField(user, "Period start", "2026-09-01");
@@ -539,6 +520,7 @@ describe("outside-scope invoice draft", () => {
     await user.click(screen.getByRole("tab", { name: "Tax & issue" }));
     await replaceField(user, "Issue date", "2026-09-04");
     await screen.findByText("Could not save draft. Your edits are still here.");
+    await waitForGeneratedPdfPreview();
     await user.click(screen.getByRole("button", { name: "Review and issue" }));
 
     expect(
@@ -576,7 +558,7 @@ describe("outside-scope invoice draft", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await replaceField(user, "Period start", "2026-09-01");
@@ -585,6 +567,7 @@ describe("outside-scope invoice draft", () => {
     await user.click(screen.getByRole("tab", { name: "Tax & issue" }));
     await replaceField(user, "Issue date", "2026-09-04");
     await screen.findByText("Could not save draft. Your edits are still here.");
+    await waitForGeneratedPdfPreview();
     await user.click(screen.getByRole("button", { name: "Review and issue" }));
 
     expect(await screen.findByRole("dialog", { name: "Issue invoice GGIOHK-0043?" })).toBeVisible();
@@ -619,7 +602,7 @@ describe("outside-scope invoice draft", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await user.type(screen.getByLabelText("Notes"), "Latest note");
@@ -629,6 +612,7 @@ describe("outside-scope invoice draft", () => {
     await replaceField(user, "Billable days", "4");
     await user.click(screen.getByRole("tab", { name: "Tax & issue" }));
     await replaceField(user, "Issue date", "2026-09-04");
+    await waitForGeneratedPdfPreview();
     await user.click(screen.getByRole("button", { name: "Review and issue" }));
 
     firstSave.resolve({ kind: "failed", message: "The draft could not be saved." });
@@ -672,7 +656,7 @@ describe("outside-scope invoice draft", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await replaceField(user, "Period start", "2026-08-01");
@@ -680,6 +664,7 @@ describe("outside-scope invoice draft", () => {
     await replaceField(user, "Billable days", "1");
     await user.click(screen.getByRole("tab", { name: "Tax & issue" }));
     await replaceField(user, "Issue date", "2026-09-04");
+    await waitForGeneratedPdfPreview();
     await user.click(screen.getByRole("button", { name: "Review and issue" }));
 
     const dialog = await screen.findByRole("dialog", { name: "Issue invoice GGIOHK-0043?" });
@@ -720,7 +705,7 @@ describe("outside-scope invoice draft", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await replaceField(user, "Period start", "2026-09-01");
@@ -728,6 +713,7 @@ describe("outside-scope invoice draft", () => {
     await replaceField(user, "Billable days", "4");
     await user.click(screen.getByRole("tab", { name: "Tax & issue" }));
     await replaceField(user, "Issue date", "2026-09-04");
+    await waitForGeneratedPdfPreview();
     await user.click(screen.getByRole("button", { name: "Review and issue" }));
 
     const dialog = await screen.findByRole("dialog", { name: "Issue invoice GGIOHK-0043?" });
@@ -757,7 +743,7 @@ describe("outside-scope invoice draft", () => {
     let discardCount = 0;
     let saveCount = 0;
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       discardInvoiceDraft: () => {
         discardCount += 1;
         return Promise.resolve({ kind: "discarded" });
@@ -782,7 +768,7 @@ describe("outside-scope invoice draft", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     const dialog = await screen.findByRole("dialog", { name: "Resume your invoice draft?" });
     expect(within(dialog).getByRole("button", { name: "Resume draft" })).toHaveFocus();
@@ -811,7 +797,7 @@ describe("outside-scope invoice draft", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await user.type(screen.getByLabelText("Notes"), "Discard while saving");
@@ -851,7 +837,7 @@ describe("outside-scope invoice draft", () => {
         }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     const clientSelect = await screen.findByRole("combobox", { name: "Client" });
     await replaceField(user, "Client legal name", "Edited client name");
@@ -880,7 +866,7 @@ describe("outside-scope invoice draft", () => {
 
 function readyDraftBridge(): InvoiceAppBridge {
   return {
-    ...unusedInvoiceAppCommands,
+    ...testInvoiceAppCommands,
     discardInvoiceDraft: () => Promise.resolve({ kind: "discarded" }),
     loadWorkspace: () =>
       Promise.resolve({
@@ -899,4 +885,8 @@ function readyDraftBridge(): InvoiceAppBridge {
       Promise.resolve({ kind: "saved", draft: persistedInvoiceDraftSchema.parse(draft) }),
     saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
   };
+}
+
+async function waitForGeneratedPdfPreview(): Promise<void> {
+  await screen.findByLabelText("Rendered PDF pages");
 }

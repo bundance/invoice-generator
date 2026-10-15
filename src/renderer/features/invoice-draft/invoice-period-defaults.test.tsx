@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
@@ -23,7 +23,8 @@ import {
   businessDate,
   deferred,
   replaceField,
-  unusedInvoiceAppCommands,
+  renderAppForTest,
+  testInvoiceAppCommands,
 } from "../../app/app-test-support.ts";
 
 describe("editable invoice period defaults", () => {
@@ -32,7 +33,7 @@ describe("editable invoice period defaults", () => {
   it("fills Sunday and inclusive workdays, saves them, and allows manual overrides", async () => {
     const savedDrafts = setUpWorkspace();
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
     await user.click(await screen.findByRole("tab", { name: "Work" }));
 
     await replaceField(user, "Period start", "2026-08-03");
@@ -77,7 +78,7 @@ describe("editable invoice period defaults", () => {
       earlierInvoice,
     ]);
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
     await user.click(await screen.findByRole("tab", { name: "Work" }));
 
     expect(screen.getByLabelText("Period start")).toHaveValue("");
@@ -95,7 +96,7 @@ describe("editable invoice period defaults", () => {
   it("uses the previous item's edited end and changes only the active item's calculations", async () => {
     setUpWorkspace(null, [completeIssuedInvoice]);
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await replaceField(user, "Period start", "2026-08-03");
     await replaceField(user, "Period end", "2026-08-12");
@@ -120,7 +121,7 @@ describe("editable invoice period defaults", () => {
       serviceLines: [{ ...completeInvoiceDraftInput.serviceLines[0], billableDays: "2.5" }],
     });
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
     await user.click(await screen.findByRole("button", { name: "Resume draft" }));
     await user.click(screen.getByRole("tab", { name: "Work" }));
     await user.click(screen.getByLabelText("Period start"));
@@ -142,7 +143,7 @@ describe("editable invoice period defaults", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await replaceField(user, "Period start", "2026-08-03");
     await waitFor(() => expect(savedDrafts).toHaveLength(1));
@@ -161,7 +162,7 @@ describe("editable invoice period defaults", () => {
 function setUpWorkspace(draft: InvoiceDraftInput | null = null, invoices: IssuedInvoice[] = []) {
   const savedDrafts: InvoiceDraftInput[] = [];
   window.invoiceApp = {
-    ...unusedInvoiceAppCommands,
+    ...testInvoiceAppCommands,
     loadWorkspace: async () => ({
       kind: "ready",
       workspace: {

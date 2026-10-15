@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
@@ -17,7 +17,11 @@ import {
 } from "../../../../tests/fixtures/issued-invoice.ts";
 import { completeIssuer } from "../../../../tests/fixtures/issuer-settings.ts";
 import App from "../../app/app.tsx";
-import { replaceField, unusedInvoiceAppCommands } from "../../app/app-test-support.ts";
+import {
+  renderAppForTest,
+  replaceField,
+  testInvoiceAppCommands,
+} from "../../app/app-test-support.ts";
 
 describe("foreign-currency UK VAT invoice flow", () => {
   afterEach(cleanup);
@@ -25,7 +29,7 @@ describe("foreign-currency UK VAT invoice flow", () => {
   it("resets exchange evidence whenever the draft currency changes", async () => {
     const savedDrafts: InvoiceDraftInput[] = [];
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -46,7 +50,7 @@ describe("foreign-currency UK VAT invoice flow", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     const currency = await screen.findByRole("combobox", { name: "Currency" });
     await user.selectOptions(currency, "GBP");
@@ -98,7 +102,7 @@ describe("foreign-currency UK VAT invoice flow", () => {
       },
     });
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       issueInvoice: (input) => {
         issuedDraft = input.draft;
         return Promise.resolve({
@@ -144,7 +148,7 @@ describe("foreign-currency UK VAT invoice flow", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await replaceField(user, "Period start", "2026-09-02");
@@ -158,13 +162,10 @@ describe("foreign-currency UK VAT invoice flow", () => {
     await user.selectOptions(screen.getByLabelText("Exchange-rate method"), "hmrc-period-rate");
     await replaceField(user, "Exchange-rate evidence reference", evidenceReference);
 
-    const preview = screen.getByLabelText("Invoice preview");
-    expect(preview).toHaveTextContent("USD 2,900.00");
-    expect(preview).toHaveTextContent("USD 580.00");
-    expect(preview).toHaveTextContent("GBP 2,320.00");
-    expect(preview).toHaveTextContent("GBP 464.00");
-    expect(preview).toHaveTextContent("1 GBP = 1.25 USD");
-    expect(preview).toHaveTextContent("HMRC period rate");
+    await screen.findByLabelText("Rendered PDF pages");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Review and issue" })).toBeEnabled(),
+    );
 
     await user.click(screen.getByRole("button", { name: "Review and issue" }));
     const dialog = await screen.findByRole("dialog", { name: "Issue invoice USDVAT-0012?" });

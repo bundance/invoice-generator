@@ -40,6 +40,7 @@ describe("full credit note application", () => {
       appVersion: "0.1.0",
       createClientId: () => completeClient.id,
       creditNotePdf: {
+        ...unusedPdfPreviewMethods,
         checkFit: () => Promise.resolve(true),
         prepare: (snapshot) =>
           Promise.resolve({
@@ -86,6 +87,7 @@ describe("full credit note application", () => {
       appVersion: "0.1.0",
       createClientId: () => completeClient.id,
       creditNotePdf: {
+        ...unusedPdfPreviewMethods,
         checkFit: () => Promise.resolve(true),
         prepare: () => {
           prepareCount += 1;
@@ -119,6 +121,7 @@ describe("full credit note application", () => {
       appVersion: "0.1.0",
       createClientId: () => completeClient.id,
       creditNotePdf: {
+        ...unusedPdfPreviewMethods,
         checkFit: () => Promise.resolve(true),
         prepare: () => {
           prepareCount += 1;
@@ -155,6 +158,7 @@ describe("full credit note application", () => {
       appVersion: "0.1.0",
       createClientId: () => completeClient.id,
       creditNotePdf: {
+        ...unusedPdfPreviewMethods,
         checkFit: () => Promise.resolve(true),
         prepare: () => Promise.reject(new Error("PDF verification failed")),
       },
@@ -180,6 +184,52 @@ describe("full credit note application", () => {
       },
     });
   });
+  it("previews a reviewed full credit without changing history or either sequence", async () => {
+    let previewedCandidate: FullCreditNoteCandidate | undefined;
+    const application = await openInvoiceApplication({
+      appVersion: "0.1.0",
+      createClientId: () => completeClient.id,
+      creditNotePdf: {
+        ...unusedPdfPreviewMethods,
+        checkFit: () => Promise.resolve(true),
+        prepare: () => Promise.reject(new Error("Credit-note issue is not used in this test")),
+        preview: (candidate) => {
+          previewedCandidate = candidate;
+          return Promise.resolve({
+            bytes: new Uint8Array([37, 80, 68, 70]),
+            documentId: candidate.id,
+            pageCount: 2,
+          });
+        },
+      },
+      currentBusinessDate: () => parseBusinessDate("2026-09-07"),
+      currentTimestamp: () => "2026-09-07T10:11:12.000Z",
+      datasetArchive: unusedDatasetArchive,
+      invoicePdf: unusedInvoicePdf,
+      workspaceRepository: memoryRepository({
+        ...initialWorkspaceState,
+        clients: [completeClient],
+        issuedInvoices: [completeIssuedInvoice],
+      }),
+    });
+
+    await expect(application.previewFullCreditNote(fullCreditNoteInput)).resolves.toMatchObject({
+      kind: "ready",
+      preview: { documentId: "CN-GGIOHK-0043", pageCount: 2 },
+    });
+    expect(previewedCandidate).toMatchObject({
+      id: "CN-GGIOHK-0043",
+      originalInvoiceId: "GGIOHK-0043",
+    });
+    await expect(application.loadWorkspace()).resolves.toMatchObject({
+      kind: "ready",
+      workspace: {
+        clients: [{ invoiceSequence: { nextNumber: "43" } }],
+        creditNotes: [],
+        issuedInvoices: [completeIssuedInvoice],
+      },
+    });
+  });
 });
 
 const fullCreditNoteInput = {
@@ -188,7 +238,13 @@ const fullCreditNoteInput = {
   reason: "The billed service period was incorrect.",
 } as const;
 
+const unusedPdfPreviewMethods = {
+  preview: () => Promise.reject(new Error("Credit-note preview is not used in this test")),
+  previewDraft: () => Promise.reject(new Error("Invoice preview is not used in this test")),
+} as const;
+
 const unusedInvoicePdf = {
+  ...unusedPdfPreviewMethods,
   checkFit: () => Promise.resolve(true),
   prepare: () => Promise.reject(new Error("Invoice PDF is not used in this test")),
 } as const;

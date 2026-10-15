@@ -25,6 +25,7 @@
   position: sticky;
   top: calc(var(--app-shell-top-bar-height) + var(--app-shell-sticky-gap));
   display: grid;
+  overflow: hidden;
   height: calc(
     100vh - var(--app-shell-top-bar-height) - var(--app-shell-sticky-gap) -
       var(--app-shell-sticky-gap)
@@ -103,61 +104,6 @@
   color: #455047;
   font-variant-numeric: tabular-nums;
   text-align: center;
-}
-
-.live-a4-preview-viewport {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  align-items: flex-start;
-  justify-content: flex-start;
-  overflow: hidden;
-}
-
-.live-a4-preview-font-status {
-  position: absolute;
-  z-index: 1;
-  display: grid;
-  max-width: 320px;
-  min-height: 112px;
-  align-content: center;
-  justify-items: center;
-  place-self: center;
-  gap: 12px;
-  padding: 22px 26px;
-  border: 1px solid #b8c0b8;
-  border-radius: 10px;
-  background: #f8faf7;
-  color: #455047;
-  text-align: center;
-  line-height: 1.45;
-}
-
-.live-a4-preview-font-status p {
-  margin: 0;
-}
-
-.live-a4-preview-document[aria-hidden="true"] {
-  visibility: hidden;
-}
-
-.live-a4-preview-frame[data-preview-mode="manual"] .live-a4-preview-viewport {
-  overflow: auto;
-}
-
-.live-a4-preview-page {
-  flex: none;
-  margin: auto;
-}
-
-.live-a4-preview-document {
-  width: max-content;
-  transform-origin: top left;
-}
-
-.live-a4-preview-document .pdf-page {
-  box-shadow: 0 8px 24px rgb(38 49 41 / 12%);
 }
 
 .invoice-paper {

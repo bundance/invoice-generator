@@ -12,6 +12,7 @@ import {
   type InvoiceIssueReviewResult,
   type InvoiceAppBridge,
   type IssuerSettingsSaveResult,
+  type PdfPreviewResult,
   type RestoreInspectionResult,
   type RestoreResult,
   type ReplacementDraftCreateResult,
@@ -43,6 +44,8 @@ import {
   issueFullCreditNoteChannel,
   openRetainedDocumentChannel,
   printRetainedDocumentChannel,
+  previewFullCreditNoteChannel,
+  previewInvoiceDraftChannel,
   quitApplicationChannel,
   reviewInvoiceIssueChannel,
   reviewFullCreditNoteChannel,
@@ -136,6 +139,18 @@ const invoiceAppBridge = {
       return Promise.reject(new Error("printRetainedDocument requires one document ID"));
     }
     return ipcRenderer.invoke(printRetainedDocumentChannel, inputs[0]);
+  },
+  previewInvoiceDraft: (...inputs: [InvoiceDraftInput]): Promise<PdfPreviewResult> => {
+    if (inputs.length !== 1) {
+      return Promise.reject(new Error("previewInvoiceDraft requires one draft input"));
+    }
+    return ipcRenderer.invoke(previewInvoiceDraftChannel, inputs[0]);
+  },
+  previewFullCreditNote: (...inputs: [FullCreditNoteInput]): Promise<PdfPreviewResult> => {
+    if (inputs.length !== 1) {
+      return Promise.reject(new Error("previewFullCreditNote requires one credit-note input"));
+    }
+    return ipcRenderer.invoke(previewFullCreditNoteChannel, inputs[0]);
   },
   quitApplication: (...inputs: []): Promise<void> => {
     if (inputs.length > 0) {

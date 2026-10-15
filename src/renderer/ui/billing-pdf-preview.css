@@ -1,0 +1,58 @@
+.billing-pdf-preview__viewport {
+  display: grid;
+  grid-auto-rows: max-content;
+  min-height: 0;
+  padding: 16px;
+  overflow: auto;
+  gap: 18px;
+  align-content: start;
+  align-items: start;
+  justify-items: center;
+  background: var(--workspace-canvas);
+}
+
+.live-a4-preview-frame[data-preview-mode="manual"] .billing-pdf-preview__viewport {
+  justify-items: start;
+}
+
+.billing-pdf-preview__page {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 18px rgb(34 39 35 / 16%);
+  background: white;
+}
+
+.billing-pdf-preview__page canvas {
+  display: block;
+}
+
+.billing-pdf-preview__page .textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  text-align: initial;
+  transform-origin: 0 0;
+}
+
+.billing-pdf-preview__page .textLayer span,
+.billing-pdf-preview__page .textLayer br {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+}
+
+.billing-pdf-preview__page .textLayer ::selection {
+  background: rgb(42 103 75 / 28%);
+}
+
+.billing-pdf-preview__status {
+  display: grid;
+  min-height: 14rem;
+  place-content: center;
+  justify-items: center;
+  padding: 24px;
+  text-align: center;
+}

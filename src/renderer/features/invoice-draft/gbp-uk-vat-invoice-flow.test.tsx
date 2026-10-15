@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
@@ -16,7 +16,11 @@ import {
 } from "../../../../tests/fixtures/issued-invoice.ts";
 import { completeIssuer } from "../../../../tests/fixtures/issuer-settings.ts";
 import App from "../../app/app.tsx";
-import { replaceField, unusedInvoiceAppCommands } from "../../app/app-test-support.ts";
+import {
+  renderAppForTest,
+  replaceField,
+  testInvoiceAppCommands,
+} from "../../app/app-test-support.ts";
 
 describe("GBP UK VAT invoice flow", () => {
   afterEach(cleanup);
@@ -24,7 +28,7 @@ describe("GBP UK VAT invoice flow", () => {
   it("keeps the draft, confirmation, issued invoice, and history VAT facts in agreement", async () => {
     let issuedDraft: InvoiceDraftInput = completeGbpVatInvoiceDraftInput;
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       issueInvoice: (input) => {
         issuedDraft = input.draft;
         return Promise.resolve({
@@ -67,7 +71,7 @@ describe("GBP UK VAT invoice flow", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("tab", { name: "Work" }));
     await replaceField(user, "Period start", "2026-09-02");
@@ -80,12 +84,10 @@ describe("GBP UK VAT invoice flow", () => {
     expect(screen.getByLabelText("Tax point")).toHaveValue("2026-09-06");
     await replaceField(user, "Tax point", "2026-09-05");
 
-    const preview = screen.getByLabelText("Invoice preview");
-    expect(preview).toHaveTextContent("GBP 2,900.00");
-    expect(preview).toHaveTextContent("GBP 580.00");
-    expect(preview).toHaveTextContent("GBP 3,480.00");
-    expect(preview).toHaveTextContent("20%");
-    expect(preview).toHaveTextContent("Tax point: 2026-09-05");
+    await screen.findByLabelText("Rendered PDF pages");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Review and issue" })).toBeEnabled(),
+    );
 
     await user.click(screen.getByRole("button", { name: "Review and issue" }));
     const dialog = await screen.findByRole("dialog", { name: "Issue invoice ACME-0008?" });

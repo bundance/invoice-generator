@@ -134,6 +134,7 @@ describe("dataset backup application", () => {
       appVersion: "0.1.0",
       createClientId: () => completeClient.id,
       creditNotePdf: {
+        ...unusedPdfPreviewMethods,
         checkFit: () => Promise.resolve(true),
         prepare: () => Promise.reject(new Error("Credit-note issue is not used in this test")),
       },
@@ -141,6 +142,7 @@ describe("dataset backup application", () => {
       currentTimestamp: () => "2026-09-04T10:11:12.000Z",
       datasetArchive,
       invoicePdf: {
+        ...unusedPdfPreviewMethods,
         checkFit: () => Promise.resolve(true),
         prepare: (snapshot) =>
           Promise.resolve({
@@ -271,6 +273,7 @@ function openTestApplication(
     appVersion: "0.1.0",
     createClientId: () => completeClient.id,
     creditNotePdf: {
+      ...unusedPdfPreviewMethods,
       checkFit: () => Promise.resolve(true),
       prepare: () => Promise.reject(new Error("Credit-note issue is not used in this test")),
     },
@@ -278,6 +281,7 @@ function openTestApplication(
     currentTimestamp: () => "2026-09-04T10:11:12.000Z",
     datasetArchive,
     invoicePdf: {
+      ...unusedPdfPreviewMethods,
       checkFit: () => Promise.resolve(true),
       prepare: () => Promise.reject(new Error("Invoice issue is not used in this test")),
     },
@@ -309,3 +313,7 @@ function memoryWorkspaceRepository(): WorkspaceRepository {
     },
   };
 }
+const unusedPdfPreviewMethods = {
+  preview: () => Promise.reject(new Error("Credit-note preview is not used in this test")),
+  previewDraft: () => Promise.reject(new Error("Invoice preview is not used in this test")),
+} as const;

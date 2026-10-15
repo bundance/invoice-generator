@@ -18,7 +18,7 @@ import type { ReplacementDraft } from "../domain/invoices/replacement.ts";
 import type { IssuerSettings, IssuerSettingsInput } from "../domain/issuer/issuer-settings.ts";
 import type { BusinessDate } from "../domain/time/business-date.ts";
 import type { RestoreCleanup, RestoreId } from "./dataset-restore.ts";
-import type { DatasetArchiveSummary, WorkspaceDraft } from "./workspace.ts";
+import type { DatasetArchiveSummary, PdfPreview, WorkspaceDraft } from "./workspace.ts";
 import type { WorkspaceRecoveryProblem } from "./workspace-recovery.ts";
 
 export type WorkspaceSummary = Readonly<{
@@ -82,6 +82,10 @@ export type FullCreditNoteIssueResult =
   | Readonly<{ kind: "invalid"; message: string }>
   | Readonly<{ kind: "failed"; message: string }>;
 
+export type PdfPreviewResult =
+  | Readonly<{ kind: "ready"; preview: PdfPreview }>
+  | Readonly<{ kind: "invalid" | "failed"; message: string }>;
+
 export type RetainedDocumentActionResult =
   | Readonly<{ kind: "completed" }>
   | Readonly<{ kind: "cancelled" }>
@@ -117,6 +121,8 @@ export type InvoiceAppBridge = Readonly<{
   reviewInvoiceIssue: (input: InvoiceDraftInput) => Promise<InvoiceIssueReviewResult>;
   reviewFullCreditNote: (input: FullCreditNoteInput) => Promise<FullCreditNoteReviewResult>;
   openRetainedDocument: (documentId: DocumentId) => Promise<RetainedDocumentActionResult>;
+  previewInvoiceDraft: (input: InvoiceDraftInput) => Promise<PdfPreviewResult>;
+  previewFullCreditNote: (input: FullCreditNoteInput) => Promise<PdfPreviewResult>;
   printRetainedDocument: (documentId: DocumentId) => Promise<RetainedDocumentActionResult>;
   quitApplication: () => Promise<void>;
   inspectRestoreBackup: () => Promise<RestoreInspectionResult>;

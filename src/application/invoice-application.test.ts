@@ -53,6 +53,7 @@ describe("invoice application", () => {
       currentBusinessDate: () => parseBusinessDate("2026-09-06"),
       currentTimestamp: () => "2026-09-06T10:11:12.000Z",
       invoicePdf: {
+        ...unusedPdfPreviewMethods,
         checkFit: () => Promise.resolve(true),
         prepare: (snapshot) =>
           Promise.resolve({
@@ -122,6 +123,7 @@ describe("invoice application", () => {
       currentBusinessDate: fixedBusinessDate,
       currentTimestamp: () => "2026-09-04T10:11:12.000Z",
       invoicePdf: {
+        ...unusedPdfPreviewMethods,
         checkFit: () => Promise.resolve(true),
         prepare: (snapshot) =>
           Promise.resolve({
@@ -182,6 +184,7 @@ describe("invoice application", () => {
       createClientId: () => completeClient.id,
       currentBusinessDate: fixedBusinessDate,
       invoicePdf: {
+        ...unusedPdfPreviewMethods,
         checkFit: () => Promise.resolve(true),
         prepare: () => Promise.reject(new Error("PDF verification failed")),
       },
@@ -345,6 +348,7 @@ describe("invoice application", () => {
       createClientId: () => completeClient.id,
       currentBusinessDate: fixedBusinessDate,
       invoicePdf: {
+        ...unusedPdfPreviewMethods,
         checkFit: () => Promise.resolve(true),
         prepare: (snapshot) => {
           prepareCount += 1;
@@ -776,6 +780,76 @@ describe("invoice application", () => {
       kind: "saved",
     });
   });
+  it("previews the current draft without reserving its proposed invoice number", async () => {
+    const workspaceRepository = memoryWorkspaceRepository({
+      ...initialWorkspaceState,
+      clients: [completeClient],
+      issuer: completeIssuer,
+    });
+    const invoiceApplication = await openInvoiceApplication({
+      ...testIssueDependencies,
+      appVersion: "0.1.0",
+      createClientId: () => completeClient.id,
+      currentBusinessDate: fixedBusinessDate,
+      invoicePdf: {
+        ...testIssueDependencies.invoicePdf,
+        previewDraft: (_issuer, review) => {
+          expect(review.preview.proposedInvoiceId).toBe("GGIOHK-0043");
+          return Promise.resolve({
+            bytes: new Uint8Array([37, 80, 68, 70]),
+            documentId: "GGIOHK-0043",
+            pageCount: 2,
+          });
+        },
+      },
+      workspaceRepository,
+    });
+
+    await expect(
+      invoiceApplication.previewInvoiceDraft(
+        persistedInvoiceDraftSchema.parse(completeInvoiceDraftInput),
+      ),
+    ).resolves.toMatchObject({
+      kind: "ready",
+      preview: { documentId: "GGIOHK-0043", pageCount: 2 },
+    });
+    await expect(invoiceApplication.loadWorkspace()).resolves.toMatchObject({
+      kind: "ready",
+      workspace: { clients: [{ invoiceSequence: { nextNumber: "43" } }], issuedInvoices: [] },
+    });
+  });
+
+  it("reports draft preview generation failure without changing the workspace", async () => {
+    const workspaceRepository = memoryWorkspaceRepository({
+      ...initialWorkspaceState,
+      clients: [completeClient],
+      issuer: completeIssuer,
+    });
+    const invoiceApplication = await openInvoiceApplication({
+      ...testIssueDependencies,
+      appVersion: "0.1.0",
+      createClientId: () => completeClient.id,
+      currentBusinessDate: fixedBusinessDate,
+      invoicePdf: {
+        ...testIssueDependencies.invoicePdf,
+        previewDraft: () => Promise.reject(new Error("PDF generation failed")),
+      },
+      workspaceRepository,
+    });
+
+    await expect(
+      invoiceApplication.previewInvoiceDraft(
+        persistedInvoiceDraftSchema.parse(completeInvoiceDraftInput),
+      ),
+    ).resolves.toEqual({
+      kind: "failed",
+      message: "Could not prepare the invoice preview.",
+    });
+    await expect(invoiceApplication.loadWorkspace()).resolves.toMatchObject({
+      kind: "ready",
+      workspace: { clients: [{ invoiceSequence: { nextNumber: "43" } }], issuedInvoices: [] },
+    });
+  });
 });
 
 function fixedBusinessDate(): BusinessDate {
@@ -800,8 +874,14 @@ function memoryWorkspaceRepository(
   };
 }
 
+const unusedPdfPreviewMethods = {
+  preview: () => Promise.reject(new Error("Credit-note preview is not used in this test")),
+  previewDraft: () => Promise.reject(new Error("Invoice preview is not used in this test")),
+} as const;
+
 const testIssueDependencies = {
   creditNotePdf: {
+    ...unusedPdfPreviewMethods,
     checkFit: () => Promise.resolve(true),
     prepare: () =>
       Promise.reject(new Error("Credit-note PDF preparation is not used in this test")),
@@ -809,6 +889,7 @@ const testIssueDependencies = {
   currentTimestamp: () => "2026-09-04T10:11:12.000Z",
   datasetArchive: unusedDatasetArchive,
   invoicePdf: {
+    ...unusedPdfPreviewMethods,
     checkFit: () => Promise.resolve(true),
     prepare: () => Promise.reject(new Error("Invoice PDF preparation is not used in this test")),
   },

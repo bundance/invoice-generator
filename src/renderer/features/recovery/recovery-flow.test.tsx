@@ -1,10 +1,10 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import { restoreIdSchema } from "../../../application/dataset-restore.js";
 import App from "../../app/app.js";
-import { unusedInvoiceAppCommands } from "../../app/app-test-support.js";
+import { renderAppForTest, testInvoiceAppCommands } from "../../app/app-test-support.js";
 
 const restoreId = restoreIdSchema.parse("7a56ed1d-f110-4f1f-8b80-6064af3f1636");
 const backupSummary = {
@@ -27,10 +27,10 @@ describe("workspace recovery", () => {
     ["unreadable", "Unreadable state"],
   ] as const)("labels %s state clearly", async (problem, label) => {
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () => Promise.resolve({ kind: "recovery-required", problem }),
     };
-    render(<App />);
+    renderAppForTest(<App />);
 
     expect(await screen.findByText(label)).toBeVisible();
   });
@@ -38,7 +38,7 @@ describe("workspace recovery", () => {
   it("shows the problem category and only recovery or quit actions", async () => {
     let quitCount = 0;
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () => Promise.resolve({ kind: "recovery-required", problem: "malformed" }),
       quitApplication: () => {
         quitCount += 1;
@@ -46,7 +46,7 @@ describe("workspace recovery", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     expect(await screen.findByRole("heading", { name: "Recovery required" })).toBeVisible();
     expect(screen.getByText("Malformed state")).toBeVisible();
@@ -66,7 +66,7 @@ describe("workspace recovery", () => {
     ["failed", "Restore did not replace the blocked dataset. Recovery is still required."],
   ] as const)("stays blocked when recovery is %s", async (outcome, message) => {
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       inspectRestoreBackup: () =>
         Promise.resolve(
           outcome === "cancelled"
@@ -81,7 +81,7 @@ describe("workspace recovery", () => {
       restoreBackup: () => Promise.resolve({ kind: "failed", message }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Select validated backup" }));
 
@@ -93,7 +93,7 @@ describe("workspace recovery", () => {
   it("commits a validated replacement through the restore contract", async () => {
     const committedRestoreIds: string[] = [];
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       inspectRestoreBackup: () =>
         Promise.resolve({ kind: "ready", restoreId, summary: backupSummary }),
       loadWorkspace: () => Promise.resolve({ kind: "recovery-required", problem: "newer-version" }),
@@ -104,7 +104,7 @@ describe("workspace recovery", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Select validated backup" }));
 

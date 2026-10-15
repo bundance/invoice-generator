@@ -36,7 +36,7 @@ description, and payment terms. Creating or selecting a client does not consume 
 1. Open **Create invoice** and select the client on the **Client** tab.
 2. Enter the first service item on the **Work** tab. Use **Add item** or **Duplicate item** for more work, then enter each item's dates, description, day rate, billable days, and VAT rate when applicable.
 3. Enter the issue and tax details on the **Tax & issue** tab.
-4. Check the live A4 preview, then select **Review and issue**.
+4. Check the generated PDF preview, then select **Review and issue**.
 5. Read the final review and select **Issue** to create the numbered invoice and retained PDF.
 
 The app autosaves the draft on this Mac. Closing and reopening the app offers to resume the saved

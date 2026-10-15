@@ -19,3 +19,4 @@ docs/Codernetic-invoice-GGIOHK-0043.pdf
 output/pdf/
 tmp/
 .scratch/git-hook-verification/
+.scratch/pdf-pagination/

@@ -12,5 +12,4 @@
 @import "../features/invoices/invoices.css";
 @import "../app/launch-state.css";
 @import "../features/invoice-draft/invoice-draft.css";
-@import "../../documents/invoice-document.css";
 @import "./responsive.css";
