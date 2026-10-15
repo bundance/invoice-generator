@@ -1,6 +1,25 @@
+.invoice-draft-layout {
+  align-items: stretch;
+}
+
 .invoice-draft-inspector {
+  container: invoice-editor / inline-size;
   display: grid;
+  min-width: 360px;
   gap: 20px;
+}
+
+.invoice-draft-inspector .settings-field,
+.invoice-draft-inspector .settings-field input,
+.invoice-draft-inspector .settings-field textarea,
+.invoice-draft-inspector .settings-field select {
+  min-width: 0;
+}
+
+.invoice-draft-inspector .settings-field,
+.invoice-item-totals strong,
+.invoice-items-total dd {
+  overflow-wrap: anywhere;
 }
 
 .draft-issue-boundary {
@@ -19,6 +38,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.draft-inspector-header {
+  flex-wrap: wrap;
 }
 
 .draft-inspector-header h2,
@@ -429,4 +452,17 @@
 .replacement-draft-notice h2,
 .replacement-draft-notice p {
   margin: 0;
+}
+
+@container invoice-editor (max-width: 420px) {
+  .draft-fields,
+  .invoice-item-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .invoice-item-totals,
+  .invoice-items-total,
+  .draft-actions {
+    flex-wrap: wrap;
+  }
 }

@@ -20,6 +20,15 @@ Object.defineProperty(globalThis, "ResizeObserver", {
   value: TestResizeObserver,
 });
 
+Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
+  configurable: true,
+  value(this: HTMLElement): DOMRect {
+    // JSDOM places every element at (0, 0); keep resize hit targets away from simulated form clicks.
+    if (this.hasAttribute("data-separator")) return new DOMRect(600, 100, 24, 800);
+    return Element.prototype.getBoundingClientRect.call(this);
+  },
+});
+
 setTestDocumentFonts(createLoadedTestDocumentFonts());
 
 Object.defineProperties(HTMLDialogElement.prototype, {
