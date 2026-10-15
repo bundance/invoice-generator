@@ -89,7 +89,11 @@ export function BillingDocument({ embedFonts = true, model }: BillingDocumentPro
                 >
                   {serviceLine.serviceDescription}
                   <br />
-                  <em>Invoice period:</em> {serviceLine.periodStart} - {serviceLine.periodEnd}
+                  <em>Invoice period:</em>
+                  <br />
+                  <span className="service-period-dates">
+                    {serviceLine.periodStart} - {serviceLine.periodEnd}
+                  </span>
                 </div>
               </td>
               <td className="document-value" data-fit-region={`billable-days-${index}`}>

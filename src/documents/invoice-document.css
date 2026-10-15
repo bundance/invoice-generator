@@ -250,6 +250,10 @@
   font-size: 7pt;
 }
 
+.service-period-dates {
+  white-space: nowrap;
+}
+
 .invoice-document--sterling-vat:has(.credit-note-link) .service-row {
   height: 40mm;
 }

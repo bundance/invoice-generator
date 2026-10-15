@@ -33,6 +33,18 @@ export function InvoiceItemFields({
 
   const blur = (fieldName: InvoiceServiceLineFieldName) => () => onFieldBlur(fieldId, fieldName);
 
+  function suggestPeriodStart(): void {
+    draftForm.suggestPeriodStart(index);
+  }
+
+  function updatePeriodEnd(): void {
+    draftForm.updatePeriodEnd(index);
+  }
+
+  function updateBillableDays(): void {
+    draftForm.updateBillableDays(index);
+  }
+
   return (
     <div className="invoice-item-fields">
       <FormField
@@ -47,8 +59,10 @@ export function InvoiceItemFields({
       <FormField
         {...field("periodStart")}
         label="Period start"
+        onFocus={suggestPeriodStart}
         registration={draftForm.register(`serviceLines.${index}.periodStart`, {
           onBlur: blur("periodStart"),
+          onChange: updatePeriodEnd,
         })}
         type="date"
       />
@@ -57,6 +71,7 @@ export function InvoiceItemFields({
         label="Period end"
         registration={draftForm.register(`serviceLines.${index}.periodEnd`, {
           onBlur: blur("periodEnd"),
+          onChange: updateBillableDays,
         })}
         type="date"
       />

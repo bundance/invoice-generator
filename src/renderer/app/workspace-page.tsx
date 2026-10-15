@@ -53,6 +53,7 @@ export function WorkspacePage({
   const invoiceDraftForm = useInvoiceDraftForm({
     clients: workspace.clients,
     initialDraft: workspace.draft?.draft ?? null,
+    invoices: workspace.issuedInvoices,
     onDraftChanged,
   });
   const usedClientIds = new Set(workspace.issuedInvoices.map((invoice) => invoice.client.id));
