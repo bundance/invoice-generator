@@ -1,0 +1,52 @@
+.resizable-panel-group {
+  width: 100%;
+}
+
+.resizable-handle {
+  position: relative;
+  display: flex;
+  width: 24px;
+  flex: none;
+  align-items: flex-start;
+  justify-content: center;
+  touch-action: none;
+}
+
+.resizable-handle::before {
+  position: absolute;
+  inset-block: 0;
+  width: 1px;
+  background: var(--line);
+  content: "";
+}
+
+.resizable-handle:hover::before,
+.resizable-handle:focus-visible::before {
+  width: 3px;
+  background: var(--focus);
+}
+
+.resizable-handle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -4px;
+}
+
+.resizable-handle__grip {
+  position: sticky;
+  z-index: 1;
+  top: calc(var(--app-shell-top-bar-height) + var(--app-shell-sticky-gap) + 32px);
+  display: grid;
+  width: 16px;
+  height: 32px;
+  margin-top: 32px;
+  place-items: center;
+  border: 1px solid #b8c0b8;
+  border-radius: 5px;
+  background: #f8faf7;
+  color: #455047;
+}
+
+.resizable-handle__grip svg {
+  width: 12px;
+  height: 16px;
+}

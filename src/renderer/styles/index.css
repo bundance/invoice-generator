@@ -6,6 +6,7 @@
 @import "./base.css";
 @import "../app/app-shell.css";
 @import "./workspace.css";
+@import "./resizable.css";
 @import "../features/issuer-settings/issuer-settings.css";
 @import "../features/clients/clients.css";
 @import "../features/invoices/invoices.css";

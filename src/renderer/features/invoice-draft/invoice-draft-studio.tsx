@@ -12,6 +12,7 @@ import { billingDocumentFonts } from "../../../documents/billing-document-fonts.
 import { BillingDocumentFontGate } from "../../ui/billing-document-font-gate.tsx";
 import { DraftRecoveryDialog } from "./draft-recovery-dialog.tsx";
 import { InvoiceDraftInspector } from "./invoice-draft-inspector.tsx";
+import { InvoiceDraftLayout } from "./invoice-draft-layout.tsx";
 import { InvoicePreview } from "./invoice-preview.tsx";
 import type { InvoiceDraftForm } from "./use-invoice-draft-form.ts";
 import type { ReplacementDraftNoticeValues } from "./replacement-draft-notice.tsx";
@@ -55,18 +56,24 @@ export function InvoiceDraftStudio({
   return (
     <BillingDocumentFontGate fonts={billingDocumentFonts}>
       {(fontReadiness) => (
-        <div className="document-studio">
-          <InvoicePreview fontReadiness={fontReadiness} issuer={issuer} review={review} />
-          <InvoiceDraftInspector
-            clients={clients}
-            draft={draft}
-            draftForm={draftForm}
-            onDiscard={discardDraft}
-            onIssued={onIssued}
-            previewIsReady={fontReadiness.status === "ready"}
-            review={review}
-            selectedClient={selectedClient}
-            replacementNotice={replacementNotice}
+        <>
+          <InvoiceDraftLayout
+            preview={
+              <InvoicePreview fontReadiness={fontReadiness} issuer={issuer} review={review} />
+            }
+            editor={
+              <InvoiceDraftInspector
+                clients={clients}
+                draft={draft}
+                draftForm={draftForm}
+                onDiscard={discardDraft}
+                onIssued={onIssued}
+                previewIsReady={fontReadiness.status === "ready"}
+                review={review}
+                selectedClient={selectedClient}
+                replacementNotice={replacementNotice}
+              />
+            }
           />
           {recoveryRequired ? (
             <DraftRecoveryDialog
@@ -74,7 +81,7 @@ export function InvoiceDraftStudio({
               onResume={onRecoveryResolved}
             />
           ) : null}
-        </div>
+        </>
       )}
     </BillingDocumentFontGate>
   );
