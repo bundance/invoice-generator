@@ -37,6 +37,7 @@ export function useInvoiceDraftItems({ draftForm, selectedClient }: UseInvoiceDr
     const draft = draftForm.getValues();
     pendingOpenIndex.current = fields.length;
     append(createInvoiceServiceLineInput(selectedClient, draft));
+    draftForm.saveChanges();
   }
 
   function duplicateItem(index: number): void {
@@ -44,6 +45,7 @@ export function useInvoiceDraftItems({ draftForm, selectedClient }: UseInvoiceDr
     if (!line) return;
     pendingOpenIndex.current = index + 1;
     insert(index + 1, { ...line });
+    draftForm.saveChanges();
   }
 
   function deleteItem(index: number): void {
@@ -51,6 +53,7 @@ export function useInvoiceDraftItems({ draftForm, selectedClient }: UseInvoiceDr
     const deletingActiveItem = fields[index]?.id === activeFieldId;
     const nextActiveField = fields[index + 1] ?? fields[index - 1] ?? fields[0];
     remove(index);
+    draftForm.saveChanges();
     if (deletingActiveItem) setActiveFieldId(nextActiveField?.id ?? null);
   }
 

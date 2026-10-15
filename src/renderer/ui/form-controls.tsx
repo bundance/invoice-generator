@@ -1,3 +1,4 @@
+import type { FocusEventHandler } from "react";
 import type { UseFormRegisterReturn } from "react-hook-form";
 
 export type FormSaveStatusKind = "not-saved" | "editing" | "saving" | "saved" | "error";
@@ -10,6 +11,7 @@ type FormFieldProps<FieldName extends string> = Readonly<{
   label: string;
   multiline?: boolean;
   multilineRows?: number;
+  onFocus?: FocusEventHandler<HTMLInputElement | HTMLTextAreaElement>;
   readOnly?: boolean;
   registration: UseFormRegisterReturn<FieldName>;
   type?: "date" | "text";
@@ -24,6 +26,7 @@ export function FormField<FieldName extends string>({
   label,
   multiline = false,
   multilineRows = 3,
+  onFocus,
   readOnly = false,
   registration,
   type = "text",
@@ -35,6 +38,7 @@ export function FormField<FieldName extends string>({
     "aria-describedby": error ? errorId : undefined,
     "aria-invalid": error ? true : undefined,
     id,
+    onFocus,
     readOnly,
     ...registration,
   };

@@ -11,17 +11,21 @@ import {
   invoiceDraftInputsAreEqual,
   parseInvoiceDraftInput,
 } from "../../../domain/invoices/invoice-draft.ts";
+import type { IssuedInvoice } from "../../../domain/invoices/issued-invoice.ts";
 import { useAutosave, type AutosavePolicy } from "../../hooks/use-autosave.ts";
+import { createInvoicePeriodDefaults } from "./invoice-period-defaults.ts";
 
 type UseInvoiceDraftFormOptions = Readonly<{
   clients: readonly Client[];
   initialDraft: InvoiceDraft | null;
+  invoices: readonly IssuedInvoice[];
   onDraftChanged: (draft: InvoiceDraft | null) => void;
 }>;
 
 export function useInvoiceDraftForm({
   clients,
   initialDraft,
+  invoices,
   onDraftChanged,
 }: UseInvoiceDraftFormOptions) {
   const freshDraft = createFreshDraft(clients);
@@ -48,6 +52,12 @@ export function useInvoiceDraftForm({
     saveNow,
     status: saveStatus,
   } = autosave;
+  const periodDefaults = createInvoicePeriodDefaults({
+    getValues,
+    invoices,
+    onDraftChanged: queueAutosave,
+    setValue,
+  });
 
   useEffect(
     () =>
@@ -134,7 +144,12 @@ export function useInvoiceDraftForm({
     [saveNow],
   );
 
+  function saveChanges(): void {
+    queueAutosave(getValues());
+  }
+
   return {
+    ...periodDefaults,
     changeCurrency,
     control,
     discard,
@@ -143,6 +158,7 @@ export function useInvoiceDraftForm({
     initializeForFirstClient,
     openSavedDraft,
     saveBeforeReview,
+    saveChanges,
     register,
     retry,
     saveStatus,
