@@ -85,17 +85,16 @@ export type PreparedDocumentPdf = Readonly<{
 export type PdfPreview = Readonly<{
   bytes: Uint8Array;
   documentId: string;
-  pageCount: number;
 }>;
 
 export type InvoicePdf = Readonly<{
-  checkFit: (candidate: InvoiceCandidate) => Promise<boolean>;
+  checkLayout: (candidate: InvoiceCandidate) => Promise<boolean>;
   prepare: (snapshot: IssuedInvoiceSnapshot) => Promise<PreparedDocumentPdf>;
-  previewDraft: (issuer: IssuerSettings, review: InvoiceDraftReview) => Promise<PdfPreview>;
+  preview: (issuer: IssuerSettings, review: InvoiceDraftReview) => Promise<PdfPreview>;
 }>;
 
 export type CreditNotePdf = Readonly<{
-  checkFit: (candidate: FullCreditNoteCandidate) => Promise<boolean>;
+  checkLayout: (candidate: FullCreditNoteCandidate) => Promise<boolean>;
   prepare: (snapshot: CreditNoteSnapshot) => Promise<PreparedDocumentPdf>;
   preview: (candidate: FullCreditNoteCandidate) => Promise<PdfPreview>;
 }>;

@@ -1,11 +1,11 @@
-import { useState, type ChangeEvent } from "react";
+import { type ChangeEvent } from "react";
 
 import type { FullCreditNoteInput } from "../../../domain/invoices/credit-note.ts";
 import { reviewFullCreditNote } from "../../../domain/invoices/credit-note.ts";
 import type { IssuedInvoice } from "../../../domain/invoices/issued-invoice.ts";
 import type { BusinessDate } from "../../../domain/time/business-date.ts";
-import type { BillingPdfPreviewReadiness } from "../../ui/billing-pdf-preview.tsx";
-import { CreditNotePreview } from "./credit-note-preview.tsx";
+import { BillingPdfPreview } from "../../ui/billing-pdf-preview.tsx";
+import { useBillingPdfPreview } from "../../hooks/use-billing-pdf-preview.ts";
 import { FullCreditNoteDialog } from "./full-credit-note-dialog.tsx";
 import { RetainedDocumentActions } from "./retained-document-actions.tsx";
 import type { useFullCreditNoteIssue } from "./use-full-credit-note-issue.ts";
@@ -29,11 +29,11 @@ export function FullCreditNoteEditor({
   onIssueDateChange,
   onReasonChange,
 }: FullCreditNoteEditorProps) {
-  const [previewReadiness, setPreviewReadiness] = useState<BillingPdfPreviewReadiness | null>(null);
-  const previewRequestKey = JSON.stringify(input);
-  const previewIsReady =
-    previewReadiness?.requestKey === previewRequestKey && previewReadiness.ready;
   const previewReview = reviewFullCreditNote({ input, invoice, today: currentBusinessDate });
+  const preview = useBillingPdfPreview(
+    previewReview.kind === "ready" ? { kind: "credit-note", input } : null,
+  );
+  const previewIsReady = preview.state.kind === "displayed";
   const updateReason = (event: ChangeEvent<HTMLTextAreaElement>) => {
     onReasonChange(event.target.value);
   };
@@ -107,11 +107,7 @@ export function FullCreditNoteEditor({
           </button>
         </div>
         {previewReview.kind === "ready" ? (
-          <CreditNotePreview
-            input={input}
-            onReadyChange={setPreviewReadiness}
-            requestKey={previewRequestKey}
-          />
+          <BillingPdfPreview ariaLabel="Credit note preview" preview={preview} />
         ) : (
           <section className="preview-panel credit-note-preview-empty">
             Enter the correction reason and a valid date to preview the credit note.

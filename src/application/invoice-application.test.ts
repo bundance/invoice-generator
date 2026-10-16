@@ -1,3 +1,4 @@
+import { unusedPdfPreviewMethods } from "../../tests/fixtures/pdf-preview.ts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { type ClientInput, persistedClientSchema } from "../domain/clients/client.js";
@@ -28,6 +29,39 @@ import { openInvoiceApplication } from "./invoice-application.js";
 import { unusedDatasetArchive } from "./application-test-support.js";
 
 describe("invoice application", () => {
+  it.each([
+    {
+      label: "a layout violation",
+      checkLayout: () => Promise.resolve(false),
+      expected: { kind: "invalid", message: "The invoice cannot be laid out on A4 pages." },
+    },
+    {
+      label: "an engine failure",
+      checkLayout: () => Promise.reject(new Error("Font unavailable")),
+      expected: { kind: "failed", message: "Could not check the final invoice layout." },
+    },
+  ])(
+    "distinguishes $label without consuming an invoice number",
+    async ({ checkLayout, expected }) => {
+      const repository = memoryWorkspaceRepository({
+        ...initialWorkspaceState,
+        clients: [completeClient],
+        issuer: completeIssuer,
+      });
+      const application = await openInvoiceApplication({
+        ...testIssueDependencies,
+        appVersion: "0.1.0",
+        createClientId: () => completeClient.id,
+        currentBusinessDate: () => parseBusinessDate("2026-09-04"),
+        invoicePdf: { ...testIssueDependencies.invoicePdf, checkLayout },
+        workspaceRepository: repository,
+      });
+      expect(await application.reviewInvoiceIssue(completeInvoiceDraftInput)).toEqual(expected);
+      expect((await repository.load()).clients[0]?.invoiceSequence.nextNumber).toBe("43");
+      expect((await repository.load()).issuedInvoices).toEqual([]);
+    },
+  );
+
   it("commits one GBP VAT issue and advances its client once under overlapping requests", async () => {
     const committedStates: WorkspaceState[] = [];
     const baseWorkspaceRepository = memoryWorkspaceRepository({
@@ -54,7 +88,7 @@ describe("invoice application", () => {
       currentTimestamp: () => "2026-09-06T10:11:12.000Z",
       invoicePdf: {
         ...unusedPdfPreviewMethods,
-        checkFit: () => Promise.resolve(true),
+        checkLayout: () => Promise.resolve(true),
         prepare: (snapshot) =>
           Promise.resolve({
             bytes: new Uint8Array([37, 80, 68, 70]),
@@ -124,7 +158,7 @@ describe("invoice application", () => {
       currentTimestamp: () => "2026-09-04T10:11:12.000Z",
       invoicePdf: {
         ...unusedPdfPreviewMethods,
-        checkFit: () => Promise.resolve(true),
+        checkLayout: () => Promise.resolve(true),
         prepare: (snapshot) =>
           Promise.resolve({
             bytes: new Uint8Array([37, 80, 68, 70]),
@@ -185,7 +219,7 @@ describe("invoice application", () => {
       currentBusinessDate: fixedBusinessDate,
       invoicePdf: {
         ...unusedPdfPreviewMethods,
-        checkFit: () => Promise.resolve(true),
+        checkLayout: () => Promise.resolve(true),
         prepare: () => Promise.reject(new Error("PDF verification failed")),
       },
       workspaceRepository,
@@ -349,7 +383,7 @@ describe("invoice application", () => {
       currentBusinessDate: fixedBusinessDate,
       invoicePdf: {
         ...unusedPdfPreviewMethods,
-        checkFit: () => Promise.resolve(true),
+        checkLayout: () => Promise.resolve(true),
         prepare: (snapshot) => {
           prepareCount += 1;
           return Promise.resolve({
@@ -793,12 +827,11 @@ describe("invoice application", () => {
       currentBusinessDate: fixedBusinessDate,
       invoicePdf: {
         ...testIssueDependencies.invoicePdf,
-        previewDraft: (_issuer, review) => {
+        preview: (_issuer, review) => {
           expect(review.preview.proposedInvoiceId).toBe("GGIOHK-0043");
           return Promise.resolve({
             bytes: new Uint8Array([37, 80, 68, 70]),
             documentId: "GGIOHK-0043",
-            pageCount: 2,
           });
         },
       },
@@ -811,7 +844,7 @@ describe("invoice application", () => {
       ),
     ).resolves.toMatchObject({
       kind: "ready",
-      preview: { documentId: "GGIOHK-0043", pageCount: 2 },
+      preview: { documentId: "GGIOHK-0043" },
     });
     await expect(invoiceApplication.loadWorkspace()).resolves.toMatchObject({
       kind: "ready",
@@ -832,7 +865,7 @@ describe("invoice application", () => {
       currentBusinessDate: fixedBusinessDate,
       invoicePdf: {
         ...testIssueDependencies.invoicePdf,
-        previewDraft: () => Promise.reject(new Error("PDF generation failed")),
+        preview: () => Promise.reject(new Error("PDF generation failed")),
       },
       workspaceRepository,
     });
@@ -874,15 +907,10 @@ function memoryWorkspaceRepository(
   };
 }
 
-const unusedPdfPreviewMethods = {
-  preview: () => Promise.reject(new Error("Credit-note preview is not used in this test")),
-  previewDraft: () => Promise.reject(new Error("Invoice preview is not used in this test")),
-} as const;
-
 const testIssueDependencies = {
   creditNotePdf: {
     ...unusedPdfPreviewMethods,
-    checkFit: () => Promise.resolve(true),
+    checkLayout: () => Promise.resolve(true),
     prepare: () =>
       Promise.reject(new Error("Credit-note PDF preparation is not used in this test")),
   },
@@ -890,7 +918,7 @@ const testIssueDependencies = {
   datasetArchive: unusedDatasetArchive,
   invoicePdf: {
     ...unusedPdfPreviewMethods,
-    checkFit: () => Promise.resolve(true),
+    checkLayout: () => Promise.resolve(true),
     prepare: () => Promise.reject(new Error("Invoice PDF preparation is not used in this test")),
   },
 } as const;

@@ -1,17 +1,6 @@
-import {
-  createElement,
-  createContext,
-  useCallback,
-  useContext,
-  useState,
-  type ReactNode,
-} from "react";
+import { createElement, createContext, useContext, useState, type ReactNode } from "react";
 
-import {
-  useBillingPdfPreview,
-  type BillingPdfPreviewRequest,
-  type BillingPdfPreviewState,
-} from "../hooks/use-billing-pdf-preview.ts";
+import type { BillingPdfPreviewController } from "../hooks/use-billing-pdf-preview.ts";
 import { BillingPdfPages, type BillingPdfViewer } from "./billing-pdf-pages.tsx";
 import { BillingPdfToolbar } from "./billing-pdf-toolbar.tsx";
 import "./billing-pdf-preview.css";
@@ -20,14 +9,7 @@ export type { BillingPdfViewerProps } from "./billing-pdf-pages.tsx";
 
 type BillingPdfPreviewProps = Readonly<{
   ariaLabel: string;
-  onReadyChange?: (readiness: BillingPdfPreviewReadiness) => void;
-  request: BillingPdfPreviewRequest;
-  requestKey: string;
-}>;
-
-export type BillingPdfPreviewReadiness = Readonly<{
-  ready: boolean;
-  requestKey: string;
+  preview: BillingPdfPreviewController;
 }>;
 
 const BillingPdfViewerContext = createContext<BillingPdfViewer>(BillingPdfPages);
@@ -41,73 +23,40 @@ export function BillingPdfViewerProvider({
   );
 }
 
-export function BillingPdfPreview({
-  ariaLabel,
-  onReadyChange,
-  request,
-  requestKey,
-}: BillingPdfPreviewProps) {
-  const { retry, state } = useBillingPdfPreview(request, requestKey);
+export function BillingPdfPreview({ ariaLabel, preview }: BillingPdfPreviewProps) {
+  const { markDisplayed, reportDisplayFailure, retry, state } = preview;
   const PdfViewer = useContext(BillingPdfViewerContext);
   const [zoom, setZoom] = useState<"fit" | number>("fit");
-  const [viewerFailure, setViewerFailure] = useState<Readonly<{
-    message: string;
-    requestKey: string;
-  }> | null>(null);
-  const activeViewerFailure = viewerFailure?.requestKey === requestKey ? viewerFailure : null;
-  const notifyReadyChange = useCallback(
-    (ready: boolean) => onReadyChange?.({ ready, requestKey }),
-    [onReadyChange, requestKey],
-  );
-
-  const markReady = useCallback(() => notifyReadyChange(true), [notifyReadyChange]);
-  const reportViewerFailure = useCallback(
-    (message: string) => {
-      setViewerFailure({ message, requestKey });
-      notifyReadyChange(false);
-    },
-    [notifyReadyChange, requestKey],
-  );
-  const retryPreview = useCallback(() => {
-    setViewerFailure(null);
-    notifyReadyChange(false);
-    retry();
-  }, [notifyReadyChange, retry]);
-
-  const displayedState: BillingPdfPreviewState = activeViewerFailure
-    ? { kind: "failed", message: activeViewerFailure.message }
-    : state;
+  const hasPdf = state.kind === "rendering" || state.kind === "displayed";
 
   return (
     <section
-      aria-busy={displayedState.kind === "loading"}
+      aria-busy={state.kind === "loading" || state.kind === "rendering"}
       aria-label={ariaLabel}
-      className="preview-panel live-a4-preview-frame"
+      className="preview-panel billing-pdf-preview"
       data-preview-mode={zoom === "fit" ? "fit" : "manual"}
     >
       <BillingPdfToolbar
-        documentId={
-          displayedState.kind === "ready" ? displayedState.preview.documentId : "Preparing…"
-        }
+        documentId={hasPdf ? state.preview.documentId : "Preparing…"}
         onZoomChange={setZoom}
         zoom={zoom}
       />
-      {displayedState.kind === "loading" ? (
+      {state.kind === "loading" ? (
         <output className="billing-pdf-preview__status">Preparing generated PDF…</output>
       ) : null}
-      {displayedState.kind === "failed" ? (
+      {state.kind === "failed" ? (
         <div className="billing-pdf-preview__status" role="alert">
-          <p>{displayedState.message}</p>
-          <button className="secondary-action" onClick={retryPreview} type="button">
+          <p>{state.message}</p>
+          <button className="secondary-action" onClick={retry} type="button">
             Retry
           </button>
         </div>
       ) : null}
-      {displayedState.kind === "ready"
+      {hasPdf
         ? createElement(PdfViewer, {
-            bytes: displayedState.preview.bytes,
-            onError: reportViewerFailure,
-            onReady: markReady,
+            bytes: state.preview.bytes,
+            onError: reportDisplayFailure,
+            onReady: markDisplayed,
             zoom,
           })
         : null}

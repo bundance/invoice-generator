@@ -3,6 +3,7 @@ import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import "pdfjs-dist/web/pdf_viewer.css";
 import { useCallback, useEffect, useRef, useState, type ComponentType } from "react";
 
+import { describePdfJsError } from "./pdf-js-error.ts";
 import { BillingPdfPage } from "./billing-pdf-page.tsx";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -21,7 +22,12 @@ type RenderedPages = {
   renderKey: string;
 };
 
-type LoadedPdf = Readonly<{ bytes: Uint8Array; document: PDFDocumentProxy }>;
+type LoadedPdf = Readonly<{
+  bytes: Uint8Array;
+  pdf: PDFDocumentProxy;
+  naturalWidth: number;
+  naturalHeight: number;
+}>;
 
 const cssPixelsPerPdfPoint = 96 / 72;
 
@@ -29,27 +35,24 @@ export function BillingPdfPages({ bytes, onError, onReady, zoom }: BillingPdfVie
   const viewportRef = useRef<HTMLDivElement>(null);
   const [loadedPdf, setLoadedPdf] = useState<LoadedPdf | null>(null);
   const [fitScale, setFitScale] = useState(cssPixelsPerPdfPoint);
-  const fitScaleRef = useRef(fitScale);
   const renderedPagesRef = useRef<RenderedPages>({ pageNumbers: new Set(), renderKey: "" });
-  const document = loadedPdf?.bytes === bytes ? loadedPdf.document : null;
+  const activePdf = loadedPdf?.bytes === bytes ? loadedPdf : null;
+  const pdf = activePdf?.pdf;
 
   useEffect(() => {
     const loadingTask = getDocument({ data: bytes.slice() });
     let current = true;
-    void loadingTask.promise.then(
-      (nextDocument) => {
-        if (current) setLoadedPdf({ bytes, document: nextDocument });
-      },
-      (error) => {
-        if (current) {
-          onError(
-            pdfErrorMessage(
-              error instanceof Error ? error : new Error("PDF.js returned an unknown error"),
-            ),
-          );
-        }
-      },
-    );
+    void (async () => {
+      try {
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(1);
+        const natural = page.getViewport({ scale: cssPixelsPerPdfPoint });
+        if (current)
+          setLoadedPdf({ bytes, pdf, naturalWidth: natural.width, naturalHeight: natural.height });
+      } catch (error) {
+        if (current) onError(describePdfJsError(error));
+      }
+    })();
     return () => {
       current = false;
       void loadingTask.destroy();
@@ -58,47 +61,24 @@ export function BillingPdfPages({ bytes, onError, onReady, zoom }: BillingPdfVie
 
   useEffect(() => {
     const viewport = viewportRef.current;
-    if (!viewport || !document) return;
-    let current = true;
+    if (!viewport || !activePdf) return;
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return;
-      void document.getPage(1).then(
-        (page) => {
-          if (!current) return;
-          const natural = page.getViewport({ scale: cssPixelsPerPdfPoint });
-          const availableWidth = Math.max(0, entry.contentRect.width - 32);
-          const availableHeight = Math.max(0, entry.contentRect.height - 32);
-          const fitRatio = Math.min(
-            availableWidth / natural.width,
-            availableHeight / natural.height,
-            1,
-          );
-          const nextFitScale = cssPixelsPerPdfPoint * fitRatio;
-          if (nextFitScale !== fitScaleRef.current) {
-            fitScaleRef.current = nextFitScale;
-            setFitScale(nextFitScale);
-          }
-        },
-        (error) => {
-          if (current) {
-            onError(
-              pdfErrorMessage(
-                error instanceof Error ? error : new Error("PDF.js returned an unknown error"),
-              ),
-            );
-          }
-        },
+      const availableWidth = Math.max(0, entry.contentRect.width - 32);
+      const availableHeight = Math.max(0, entry.contentRect.height - 32);
+      const fitRatio = Math.min(
+        availableWidth / activePdf.naturalWidth,
+        availableHeight / activePdf.naturalHeight,
+        1,
       );
+      setFitScale(cssPixelsPerPdfPoint * fitRatio);
     });
     observer.observe(viewport);
-    return () => {
-      current = false;
-      observer.disconnect();
-    };
-  }, [document, onError]);
+    return () => observer.disconnect();
+  }, [activePdf]);
 
   const scale = zoom === "fit" ? fitScale : cssPixelsPerPdfPoint * (zoom / 100);
-  const renderKey = document ? `${document.fingerprints[0] ?? "pdf"}:${scale}` : "loading";
+  const renderKey = pdf ? `${pdf.fingerprints[0] ?? "pdf"}:${scale}` : "loading";
 
   const markPageRendered = useCallback(
     (pageNumber: number, completedRenderKey: string) => {
@@ -107,24 +87,24 @@ export function BillingPdfPages({ bytes, onError, onReady, zoom }: BillingPdfVie
         renderedPagesRef.current = { pageNumbers: new Set(), renderKey: completedRenderKey };
       }
       renderedPagesRef.current.pageNumbers.add(pageNumber);
-      if (renderedPagesRef.current.pageNumbers.size === document?.numPages) onReady();
+      if (renderedPagesRef.current.pageNumbers.size === pdf?.numPages) onReady();
     },
-    [document?.numPages, onReady, renderKey],
+    [pdf?.numPages, onReady, renderKey],
   );
 
-  const pages = document
-    ? Array.from({ length: document.numPages }, (_value, index) => ({
-        id: `${document.fingerprints[0] ?? "pdf"}-page-${index + 1}`,
+  const pages = pdf
+    ? Array.from({ length: pdf.numPages }, (_value, index) => ({
+        id: `${pdf.fingerprints[0] ?? "pdf"}-page-${index + 1}`,
         pageNumber: index + 1,
       }))
     : [];
 
   return (
     <div className="billing-pdf-preview__viewport" ref={viewportRef}>
-      {document
+      {pdf
         ? pages.map(({ id, pageNumber }) => (
             <BillingPdfPage
-              document={document}
+              pdf={pdf}
               key={id}
               onError={onError}
               onRendered={markPageRendered}
@@ -136,10 +116,4 @@ export function BillingPdfPages({ bytes, onError, onReady, zoom }: BillingPdfVie
         : null}
     </div>
   );
-}
-
-function pdfErrorMessage(error: Error): string {
-  return error.message
-    ? `Could not display the PDF preview: ${error.message}`
-    : "Could not display the PDF preview.";
 }

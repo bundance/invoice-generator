@@ -11,7 +11,7 @@
   background: var(--workspace-canvas);
 }
 
-.live-a4-preview-frame[data-preview-mode="manual"] .billing-pdf-preview__viewport {
+.billing-pdf-preview[data-preview-mode="manual"] .billing-pdf-preview__viewport {
   justify-items: start;
 }
 

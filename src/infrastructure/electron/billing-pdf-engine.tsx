@@ -4,7 +4,10 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { BillingPdfDocument } from "../../documents/billing-pdf-document.tsx";
 import { registerBillingPdfFonts } from "../../documents/billing-pdf-fonts.ts";
 import type { BillingDocumentModel } from "../../documents/invoice-document-model.ts";
-import { auditBillingPdfLayout, billingPdfLayoutSchema } from "./billing-pdf-layout.ts";
+import {
+  auditBillingPdfLayout,
+  billingPdfLayoutSchema,
+} from "../../documents/billing-pdf-layout.ts";
 
 export type RenderedBillingPdf = Readonly<{
   bytes: Uint8Array;
@@ -18,7 +21,8 @@ export async function renderBillingPdf(model: BillingDocumentModel): Promise<Ren
     <BillingPdfDocument
       model={model}
       onRender={(result) => {
-        // SAFETY: React-PDF 4.9 exposes layout metadata at runtime but omits it from OnRenderProps.
+        // SAFETY: The exact React-PDF 4.9.0 pin is required for this private layout field.
+        // An upgrade must verify the metadata schema and layout audit before changing the pin.
         const versionedResult = result as typeof result &
           Readonly<{ _INTERNAL__LAYOUT__DATA_?: unknown }>;
         layout = versionedResult._INTERNAL__LAYOUT__DATA_;

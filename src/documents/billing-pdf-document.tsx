@@ -1,3 +1,4 @@
+import { billingPdfNodeIds } from "./billing-pdf-node-ids.ts";
 // react-doctor-disable-next-line react-doctor/prefer-dynamic-import -- This module runs only in the Electron main process.
 import {
   Document,
@@ -145,7 +146,7 @@ export function BillingPdfDocument({ model, onRender }: BillingPdfDocumentProps)
       <Page size="A4" style={styles.page} wrap>
         <Text
           fixed
-          id="document-continuation"
+          id={billingPdfNodeIds.continuation}
           render={({ pageNumber }) => (pageNumber > 1 ? `${heading} · Continued` : "")}
           style={styles.continuation}
         />
@@ -198,7 +199,12 @@ export function BillingPdfDocument({ model, onRender }: BillingPdfDocumentProps)
             <Text style={styles.vat}>VAT</Text>
           </View>
           {model.serviceLines.map((line, index) => (
-            <View id={`service-row-${index}`} key={line.renderKey} style={styles.row} wrap={false}>
+            <View
+              id={billingPdfNodeIds.serviceRow(index)}
+              key={line.renderKey}
+              style={styles.row}
+              wrap={false}
+            >
               <Text id={`service-description-${index}`} style={styles.description}>
                 {line.serviceDescription}
                 <Text style={styles.period}>
@@ -222,7 +228,7 @@ export function BillingPdfDocument({ model, onRender }: BillingPdfDocumentProps)
           ))}
         </View>
 
-        <View id="document-totals" style={styles.totals} wrap={false}>
+        <View id={billingPdfNodeIds.totals} style={styles.totals} wrap={false}>
           <View style={styles.totalLine}>
             <Text>Net</Text>
             <Text id="document-total-net">{model.net}</Text>
@@ -291,13 +297,13 @@ export function BillingPdfDocument({ model, onRender }: BillingPdfDocumentProps)
           </Text>
         </View>
 
-        <Text fixed id="document-footer" style={styles.footer}>
+        <Text fixed id={billingPdfNodeIds.footer} style={styles.footer}>
           {model.paymentTerms}
           {`\nVAT Registration Number ${formatVatNumber(model.issuer.vatRegistrationNumber)} · Company Reg. No. ${model.issuer.companyNumber}`}
         </Text>
         <Text
           fixed
-          id="document-page-number"
+          id={billingPdfNodeIds.pageNumber}
           render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
           style={styles.pageNumber}
         />

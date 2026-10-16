@@ -3,9 +3,9 @@ import type {
   InvoiceDraftReview,
 } from "../../../domain/invoices/invoice-draft.ts";
 import type { InvoiceServiceLineFieldName } from "../../../domain/invoices/invoice-service-line.ts";
+import type { InvoiceDraftItems } from "./invoice-draft-items.types.ts";
 import { InvoiceItemAccordion } from "./invoice-item-accordion.tsx";
 import type { InvoiceDraftForm } from "./use-invoice-draft-form.ts";
-import type { InvoiceDraftItems } from "./use-invoice-draft-items.ts";
 
 type InvoiceItemsEditorProps = Readonly<{
   draft: InvoiceDraftInput;

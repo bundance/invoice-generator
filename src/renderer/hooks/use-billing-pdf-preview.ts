@@ -1,76 +1,78 @@
-import { useCallback, useEffect, useEffectEvent, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useReducer } from "react";
 
 import type { PdfPreviewResult } from "../../application/invoice-application-contract.ts";
-import type { PdfPreview } from "../../application/workspace.ts";
+import type { FullCreditNoteInput } from "../../domain/invoices/credit-note.ts";
+import type { InvoiceDraftInput } from "../../domain/invoices/invoice-draft.ts";
+import { transition, type BillingPdfPreviewState } from "./billing-pdf-preview-state.ts";
 
 export type BillingPdfPreviewRequest =
-  | Readonly<{
-      input: Parameters<Window["invoiceApp"]["previewInvoiceDraft"]>[0];
-      kind: "invoice";
-    }>
-  | Readonly<{
-      input: Parameters<Window["invoiceApp"]["previewFullCreditNote"]>[0];
-      kind: "credit-note";
-    }>;
-
-export type BillingPdfPreviewState =
-  | Readonly<{ kind: "loading" }>
-  | Readonly<{ kind: "ready"; preview: PdfPreview }>
-  | Readonly<{ kind: "failed"; message: string }>;
-
-type PreviewResultState = Readonly<{
-  result: BillingPdfPreviewState;
-  version: string;
-}>;
+  | Readonly<{ input: InvoiceDraftInput; kind: "invoice" }>
+  | Readonly<{ input: FullCreditNoteInput; kind: "credit-note" }>;
 
 export type BillingPdfPreviewController = Readonly<{
+  markDisplayed: () => void;
+  reportDisplayFailure: (message: string) => void;
   retry: () => void;
   state: BillingPdfPreviewState;
 }>;
 
+const previewDebounceMilliseconds = 180;
+
 export function useBillingPdfPreview(
-  request: BillingPdfPreviewRequest,
-  requestKey: string,
+  request: BillingPdfPreviewRequest | null,
 ): BillingPdfPreviewController {
-  const [retryCount, setRetryCount] = useState(0);
-  const [resultState, setResultState] = useState<PreviewResultState | null>(null);
-  const version = `${requestKey}:${retryCount}`;
-  const loadCurrentPreview = useEffectEvent(() => loadPreview(request));
+  const requestKey = request === null ? null : JSON.stringify(request);
+  const [attempt, dispatch] = useReducer(transition, {
+    generation: 0,
+    requestKey,
+    state: { kind: "loading" },
+  });
+  if (attempt.requestKey !== requestKey) {
+    dispatch({ kind: "request-changed", requestKey });
+  }
+  const { generation } = attempt;
+  const loadCurrentPreview = useEffectEvent(() => request && loadPreview(request));
 
   useEffect(() => {
     let current = true;
     const timer = window.setTimeout(() => {
-      void loadCurrentPreview().then(
-        (result) => {
-          if (!current) return;
-          setResultState({
-            result:
-              result.kind === "ready"
-                ? { kind: "ready", preview: result.preview }
-                : { kind: "failed", message: result.message },
-            version,
-          });
-        },
-        () => {
-          if (!current) return;
-          setResultState({
-            result: { kind: "failed", message: "Could not prepare the PDF preview." },
-            version,
-          });
-        },
-      );
-    }, 180);
+      void (async () => {
+        let state: BillingPdfPreviewState;
+        try {
+          const result = await loadCurrentPreview();
+          if (!result) return;
+          state =
+            result.kind === "ready"
+              ? { kind: "rendering", preview: result.preview }
+              : { kind: "failed", message: result.message };
+        } catch {
+          state = { kind: "failed", message: "Could not prepare the PDF preview." };
+        }
+        if (current) {
+          dispatch({ kind: "loaded", generation, state });
+        }
+      })();
+    }, previewDebounceMilliseconds);
     return () => {
       current = false;
       window.clearTimeout(timer);
     };
-  }, [version]);
+  }, [generation]);
 
-  const retry = useCallback(() => setRetryCount((count) => count + 1), []);
-  return {
-    retry,
-    state: resultState?.version === version ? resultState.result : { kind: "loading" },
-  };
+  const markDisplayed = useCallback(() => {
+    dispatch({ kind: "displayed", generation });
+  }, [generation]);
+  const reportDisplayFailure = useCallback(
+    (message: string) => {
+      dispatch({ kind: "display-failed", generation, message });
+    },
+    [generation],
+  );
+  const retry = useCallback(() => {
+    dispatch({ kind: "retry" });
+  }, []);
+
+  return { markDisplayed, reportDisplayFailure, retry, state: attempt.state };
 }
 
 function loadPreview(request: BillingPdfPreviewRequest): Promise<PdfPreviewResult> {

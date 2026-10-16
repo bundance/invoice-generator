@@ -20,3 +20,4 @@ output/pdf/
 tmp/
 .scratch/git-hook-verification/
 .scratch/pdf-pagination/
+.osgrep

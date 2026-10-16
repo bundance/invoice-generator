@@ -31,7 +31,7 @@ export const releaseStages = [
   },
   {
     command:
-      "timeout 60 vp run check:test-policy && timeout 300 vp test run src/domain src/application src/infrastructure/persistence src/infrastructure/testing src/infrastructure/release-gate src/infrastructure/electron/billing-pdf-engine.test.tsx --allowOnly=false --retry=0 --reporter=json --outputFile=test-results/domain-persistence.json",
+      "timeout 60 vp run check:test-policy && timeout 300 vp test run src/domain src/application src/infrastructure/persistence src/infrastructure/testing src/infrastructure/release-gate src/infrastructure/electron/billing-pdf-engine.test.tsx src/infrastructure/electron/invoice-pdf.test.ts --allowOnly=false --retry=0 --reporter=json --outputFile=test-results/domain-persistence.json",
     id: "domain-persistence",
     name: "domain and persistence tests",
     result: { kind: "vitest", path: "test-results/domain-persistence.json" },

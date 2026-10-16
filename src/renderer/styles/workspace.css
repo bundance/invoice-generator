@@ -21,7 +21,7 @@
   background: #dfe4dd;
 }
 
-.live-a4-preview-frame {
+.billing-pdf-preview {
   position: sticky;
   top: calc(var(--app-shell-top-bar-height) + var(--app-shell-sticky-gap));
   display: grid;

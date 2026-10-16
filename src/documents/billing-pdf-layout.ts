@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import type { BillingDocumentModel } from "../../documents/invoice-document-model.ts";
+import { billingPdfNodeIds } from "./billing-pdf-node-ids.ts";
+import type { BillingDocumentModel } from "./invoice-document-model.ts";
+
+export class BillingPdfLayoutViolation extends Error {
+  override name = "BillingPdfLayoutViolation";
+}
 
 type LayoutBox = Readonly<{
   height: number;
@@ -53,7 +58,7 @@ export function auditBillingPdfLayout(
   model: BillingDocumentModel,
 ): number {
   const { children: pages } = layoutData;
-  if (pages.length === 0) throw new Error("React-PDF returned no pages");
+  if (pages.length === 0) throw new BillingPdfLayoutViolation("React-PDF returned no pages");
 
   const pageNodes = pages.map((page) => {
     auditPage(page);
@@ -62,16 +67,18 @@ export function auditBillingPdfLayout(
   const allNodes = pageNodes.flat();
   const rowIds = allNodes
     .map(({ node }) => node.props?.id)
-    .filter((id): id is string => id?.startsWith("service-row-") ?? false);
-  const expectedRowIds = model.serviceLines.map((_line, index) => `service-row-${index}`);
+    .filter((id): id is string => (id ? billingPdfNodeIds.isServiceRow(id) : false));
+  const expectedRowIds = model.serviceLines.map((_line, index) =>
+    billingPdfNodeIds.serviceRow(index),
+  );
   if (rowIds.join("|") !== expectedRowIds.join("|")) {
-    throw new Error("React-PDF changed the service-row order or count");
+    throw new BillingPdfLayoutViolation("React-PDF changed the service-row order or count");
   }
 
-  requireIdCount(allNodes, "document-totals", 1);
+  requireIdCount(allNodes, billingPdfNodeIds.totals, 1);
   for (const nodesOnPage of pageNodes) {
-    requireIdCount(nodesOnPage, "document-page-number", 1);
-    requireIdCount(nodesOnPage, "document-continuation", 1);
+    requireIdCount(nodesOnPage, billingPdfNodeIds.pageNumber, 1);
+    requireIdCount(nodesOnPage, billingPdfNodeIds.continuation, 1);
     auditFooterClearance(nodesOnPage);
   }
   for (const positionedNode of allNodes) auditTextGeometry(positionedNode);
@@ -85,7 +92,7 @@ function auditPage(page: LayoutNode): void {
     Math.abs(page.box.width - a4WidthPoints) > geometryTolerancePoints ||
     Math.abs(page.box.height - a4HeightPoints) > geometryTolerancePoints
   ) {
-    throw new Error("React-PDF returned a non-A4 page");
+    throw new BillingPdfLayoutViolation("React-PDF returned a non-A4 page");
   }
 }
 
@@ -112,22 +119,24 @@ function collectLayoutNodes(
 }
 
 function auditFooterClearance(nodes: readonly PositionedLayoutNode[]): void {
-  const footer = nodes.find(({ node }) => node.props?.id === "document-footer");
-  if (!footer) throw new Error("React-PDF layout omitted the fixed footer");
+  const footer = nodes.find(({ node }) => node.props?.id === billingPdfNodeIds.footer);
+  if (!footer) throw new BillingPdfLayoutViolation("React-PDF layout omitted the fixed footer");
   for (const positioned of nodes) {
     const id = positioned.node.props?.id;
     if (!requiresFooterClearance(positioned.node)) continue;
     if (positioned.top + positioned.box.height > footer.top - geometryTolerancePoints) {
-      throw new Error(`React-PDF placed ${id} into the fixed footer`);
+      throw new BillingPdfLayoutViolation(`React-PDF placed ${id} into the fixed footer`);
     }
   }
 }
 
 function requiresFooterClearance(node: LayoutNode): boolean {
   const id = node.props?.id;
-  if (id === "document-footer" || id === "document-page-number") return false;
+  if (id === billingPdfNodeIds.footer || id === billingPdfNodeIds.pageNumber) return false;
   return (
-    node.type === "TEXT" || (id?.startsWith("service-row-") ?? false) || id === "document-totals"
+    node.type === "TEXT" ||
+    (id ? billingPdfNodeIds.isServiceRow(id) : false) ||
+    id === billingPdfNodeIds.totals
   );
 }
 
@@ -138,14 +147,14 @@ function auditTextGeometry(positioned: PositionedLayoutNode): void {
   const label = id ?? "unlabelled";
   const lines = node.lines ?? [];
   if (lines.some((line) => line.xAdvance > box.width + geometryTolerancePoints)) {
-    throw new Error(`React-PDF placed ${label} text outside its layout box`);
+    throw new BillingPdfLayoutViolation(`React-PDF placed ${label} text outside its layout box`);
   }
   const lineHeight = lines.reduce((height, line) => height + line.box.height, 0);
   if (lineHeight > box.height + geometryTolerancePoints) {
-    throw new Error(`React-PDF clipped ${label} text inside its layout box`);
+    throw new BillingPdfLayoutViolation(`React-PDF clipped ${label} text inside its layout box`);
   }
   if (isOutsidePage(positioned)) {
-    throw new Error(`React-PDF placed ${label} outside the A4 page`);
+    throw new BillingPdfLayoutViolation(`React-PDF placed ${label} outside the A4 page`);
   }
 }
 
@@ -165,7 +174,7 @@ function requireIdCount(
 ): void {
   const actualCount = nodes.filter(({ node }) => node.props?.id === id).length;
   if (actualCount !== expectedCount) {
-    throw new Error(
+    throw new BillingPdfLayoutViolation(
       `React-PDF layout expected ${id} ${expectedCount} time but found ${actualCount}`,
     );
   }

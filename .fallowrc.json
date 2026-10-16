@@ -26,6 +26,9 @@
   "rules": {
     "boundary-violation": "error"
   },
+  "health": {
+    "ignore": ["src/documents/pdf-font-report.ts"]
+  },
   "boundaries": {
     "zones": [
       {

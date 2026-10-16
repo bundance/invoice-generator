@@ -9,8 +9,8 @@ Review validates every generated A4 page before showing the final issue dialog. 
 - `src/renderer/features/invoice-draft/use-invoice-draft-review.ts`
 - `src/renderer/features/invoice-draft/use-invoice-issue.ts`
 - `src/renderer/features/invoice-draft/invoice-issue-dialog.tsx`
-- `src/renderer/features/invoice-draft/invoice-preview.tsx`
-- `src/infrastructure/electron/invoice-pdf.tsx`
+- `src/renderer/ui/billing-pdf-preview.tsx`
+- `src/infrastructure/electron/invoice-pdf.ts`
 - `tests/e2e/invoice-issue.spec.ts`
 
 ## Live recipe

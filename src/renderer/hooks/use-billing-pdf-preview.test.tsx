@@ -7,8 +7,133 @@ import { completeInvoiceDraftInput } from "../../../tests/fixtures/issued-invoic
 import { deferred, testInvoiceAppCommands } from "../app/app-test-support.ts";
 import { useBillingPdfPreview, type BillingPdfPreviewRequest } from "./use-billing-pdf-preview.ts";
 
+type PreviewHookProps = Readonly<{ request: BillingPdfPreviewRequest | null }>;
+
 describe("generated billing PDF preview", () => {
   afterEach(cleanup);
+
+  it("waits for display completion and keeps display callbacks stable", async () => {
+    window.invoiceApp = testInvoiceAppCommands;
+    const { result } = renderHook(() =>
+      useBillingPdfPreview({ kind: "invoice", input: completeInvoiceDraftInput }),
+    );
+    await waitFor(() => expect(result.current.state.kind).toBe("rendering"));
+    const markDisplayed = result.current.markDisplayed;
+    const reportDisplayFailure = result.current.reportDisplayFailure;
+    act(markDisplayed);
+    expect(result.current.state.kind).toBe("displayed");
+    expect(result.current.markDisplayed).toBe(markDisplayed);
+    expect(result.current.reportDisplayFailure).toBe(reportDisplayFailure);
+    act(() => reportDisplayFailure("Canvas failed"));
+    act(markDisplayed);
+    expect(result.current.state).toEqual({ kind: "failed", message: "Canvas failed" });
+  });
+
+  it("ignores display callbacks from a previous input and same-input retry", async () => {
+    window.invoiceApp = testInvoiceAppCommands;
+    const { result, rerender } = renderHook(
+      ({ notes }) =>
+        useBillingPdfPreview({ kind: "invoice", input: { ...completeInvoiceDraftInput, notes } }),
+      { initialProps: { notes: "First" } },
+    );
+    await waitFor(() => expect(result.current.state.kind).toBe("rendering"));
+    const firstDisplay = result.current;
+    act(firstDisplay.markDisplayed);
+    rerender({ notes: "Second" });
+    rerender({ notes: "First" });
+    await waitFor(() => expect(result.current.state.kind).toBe("rendering"));
+    act(firstDisplay.markDisplayed);
+    act(() => firstDisplay.reportDisplayFailure("Obsolete failure"));
+    expect(result.current.state.kind).toBe("rendering");
+    const beforeRetry = result.current;
+    act(beforeRetry.retry);
+    await waitFor(() => expect(result.current.state.kind).toBe("rendering"));
+    act(beforeRetry.markDisplayed);
+    act(() => beforeRetry.reportDisplayFailure("Obsolete retry failure"));
+    expect(result.current.state.kind).toBe("rendering");
+    act(result.current.markDisplayed);
+    expect(result.current.state.kind).toBe("displayed");
+  });
+
+  it("cancels a credit-note preview while input is invalid and starts fresh when restored", async () => {
+    let previewRequests = 0;
+    window.invoiceApp = {
+      ...testInvoiceAppCommands,
+      previewFullCreditNote: () => {
+        previewRequests += 1;
+        return Promise.resolve(readyPreview("Credit note"));
+      },
+    };
+    const request = {
+      kind: "credit-note",
+      input: {
+        originalInvoiceId: "GGIOHK-0043",
+        issueDate: "2026-09-04",
+        reason: "Correct service",
+      },
+    } as const;
+    const initialProps: PreviewHookProps = { request };
+    const { result, rerender } = renderHook(
+      ({ request }: PreviewHookProps) => useBillingPdfPreview(request),
+      { initialProps },
+    );
+    await waitFor(() => expect(result.current.state.kind).toBe("rendering"));
+    act(result.current.markDisplayed);
+    rerender({ request: null });
+    expect(result.current.state.kind).toBe("loading");
+    await act(() => new Promise((resolve) => window.setTimeout(resolve, 200)));
+    expect(previewRequests).toBe(1);
+    rerender({ request });
+    expect(result.current.state.kind).toBe("loading");
+    await waitFor(() => expect(previewRequests).toBe(2));
+    expect(result.current.state.kind).toBe("rendering");
+  });
+
+  it("starts a fresh preview when returning to a previous input", async () => {
+    window.invoiceApp = testInvoiceAppCommands;
+    const draft = persistedInvoiceDraftSchema.parse(completeInvoiceDraftInput);
+    const { result, rerender } = renderHook(
+      ({ notes }) => useBillingPdfPreview({ kind: "invoice", input: { ...draft, notes } }),
+      { initialProps: { notes: "First" } },
+    );
+    await waitFor(() => expect(result.current.state.kind).toBe("rendering"));
+    rerender({ notes: "Second" });
+    expect(result.current.state.kind).toBe("loading");
+    rerender({ notes: "First" });
+    expect(result.current.state.kind).toBe("loading");
+  });
+
+  it("does nothing when retrying without a request, including after cancelling a preview", async () => {
+    let previewRequests = 0;
+    window.invoiceApp = {
+      ...testInvoiceAppCommands,
+      previewInvoiceDraft: () => {
+        previewRequests += 1;
+        return Promise.resolve(readyPreview("Invoice"));
+      },
+    };
+    const initialProps: PreviewHookProps = { request: null };
+    const { result, rerender } = renderHook(
+      ({ request }: PreviewHookProps) => useBillingPdfPreview(request),
+      { initialProps },
+    );
+    const retry = result.current.retry;
+    const inactivePreview = result.current;
+    act(retry);
+    expect(result.current).toBe(inactivePreview);
+    await act(() => new Promise((resolve) => window.setTimeout(resolve, 200)));
+    expect(previewRequests).toBe(0);
+
+    rerender({ request: { kind: "invoice", input: completeInvoiceDraftInput } });
+    await waitFor(() => expect(result.current.state.kind).toBe("rendering"));
+    act(result.current.markDisplayed);
+    rerender({ request: null });
+    const cancelledPreview = result.current;
+    act(retry);
+    expect(result.current).toBe(cancelledPreview);
+    await act(() => new Promise((resolve) => window.setTimeout(resolve, 200)));
+    expect(previewRequests).toBe(1);
+  });
 
   it("ignores an older PDF response after the draft changes", async () => {
     const firstPreview = deferred<PdfPreviewResult>();
@@ -29,27 +154,22 @@ describe("generated billing PDF preview", () => {
     const firstRequest = { input: firstDraft, kind: "invoice" } as const;
     const secondRequest = { input: secondDraft, kind: "invoice" } as const;
     const { result, rerender } = renderHook(
-      ({
-        request,
-        requestKey,
-      }: Readonly<{
-        request: BillingPdfPreviewRequest;
-        requestKey: string;
-      }>) => useBillingPdfPreview(request, requestKey),
-      { initialProps: { request: firstRequest, requestKey: "first" } },
+      ({ request }: Readonly<{ request: BillingPdfPreviewRequest }>) =>
+        useBillingPdfPreview(request),
+      { initialProps: { request: firstRequest } },
     );
 
     await waitFor(() => expect(result.current.state.kind).toBe("loading"));
     await new Promise((resolve) => window.setTimeout(resolve, 200));
-    rerender({ request: secondRequest, requestKey: "second" });
+    rerender({ request: secondRequest });
     await new Promise((resolve) => window.setTimeout(resolve, 200));
     secondPreview.resolve(readyPreview("Second"));
-    await waitFor(() => expect(result.current.state).toMatchObject({ kind: "ready" }));
+    await waitFor(() => expect(result.current.state).toMatchObject({ kind: "rendering" }));
     firstPreview.resolve(readyPreview("First"));
     await act(() => Promise.resolve());
 
     expect(result.current.state).toMatchObject({
-      kind: "ready",
+      kind: "rendering",
       preview: { documentId: "Second" },
     });
   });
@@ -68,9 +188,7 @@ describe("generated billing PDF preview", () => {
       },
     };
     const draft = persistedInvoiceDraftSchema.parse(completeInvoiceDraftInput);
-    const { result } = renderHook(() =>
-      useBillingPdfPreview({ input: draft, kind: "invoice" }, "draft"),
-    );
+    const { result } = renderHook(() => useBillingPdfPreview({ input: draft, kind: "invoice" }));
 
     await waitFor(() =>
       expect(result.current.state).toEqual({
@@ -82,7 +200,7 @@ describe("generated billing PDF preview", () => {
     expect(result.current.state).toEqual({ kind: "loading" });
     await waitFor(() =>
       expect(result.current.state).toMatchObject({
-        kind: "ready",
+        kind: "rendering",
         preview: { documentId: "Retried" },
       }),
     );
@@ -92,6 +210,6 @@ describe("generated billing PDF preview", () => {
 function readyPreview(documentId: string): Extract<PdfPreviewResult, { kind: "ready" }> {
   return {
     kind: "ready",
-    preview: { bytes: new Uint8Array([37, 80, 68, 70]), documentId, pageCount: 1 },
+    preview: { bytes: new Uint8Array([37, 80, 68, 70]), documentId },
   };
 }

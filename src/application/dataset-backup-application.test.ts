@@ -1,3 +1,4 @@
+import { unusedPdfPreviewMethods } from "../../tests/fixtures/pdf-preview.ts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { completeClient } from "../../tests/fixtures/client.js";
@@ -135,7 +136,7 @@ describe("dataset backup application", () => {
       createClientId: () => completeClient.id,
       creditNotePdf: {
         ...unusedPdfPreviewMethods,
-        checkFit: () => Promise.resolve(true),
+        checkLayout: () => Promise.resolve(true),
         prepare: () => Promise.reject(new Error("Credit-note issue is not used in this test")),
       },
       currentBusinessDate: () => parseBusinessDate("2026-09-04"),
@@ -143,7 +144,7 @@ describe("dataset backup application", () => {
       datasetArchive,
       invoicePdf: {
         ...unusedPdfPreviewMethods,
-        checkFit: () => Promise.resolve(true),
+        checkLayout: () => Promise.resolve(true),
         prepare: (snapshot) =>
           Promise.resolve({
             bytes: new Uint8Array([37, 80, 68, 70]),
@@ -274,7 +275,7 @@ function openTestApplication(
     createClientId: () => completeClient.id,
     creditNotePdf: {
       ...unusedPdfPreviewMethods,
-      checkFit: () => Promise.resolve(true),
+      checkLayout: () => Promise.resolve(true),
       prepare: () => Promise.reject(new Error("Credit-note issue is not used in this test")),
     },
     currentBusinessDate: () => parseBusinessDate("2026-09-04"),
@@ -282,7 +283,7 @@ function openTestApplication(
     datasetArchive,
     invoicePdf: {
       ...unusedPdfPreviewMethods,
-      checkFit: () => Promise.resolve(true),
+      checkLayout: () => Promise.resolve(true),
       prepare: () => Promise.reject(new Error("Invoice issue is not used in this test")),
     },
     workspaceRepository,
@@ -313,7 +314,3 @@ function memoryWorkspaceRepository(): WorkspaceRepository {
     },
   };
 }
-const unusedPdfPreviewMethods = {
-  preview: () => Promise.reject(new Error("Credit-note preview is not used in this test")),
-  previewDraft: () => Promise.reject(new Error("Invoice preview is not used in this test")),
-} as const;

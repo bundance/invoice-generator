@@ -55,9 +55,9 @@ export function createFullCreditNoteApplication({
     if (result.kind === "invalid") return result;
 
     try {
-      return (await pdf.checkFit(result.candidate))
+      return (await pdf.checkLayout(result.candidate))
         ? result
-        : { kind: "invalid", message: "The credit note does not fit the fixed A4 layout." };
+        : { kind: "invalid", message: "The credit note cannot be laid out on A4 pages." };
     } catch {
       return { kind: "failed", message: "Could not check the final credit-note layout." };
     }
@@ -82,8 +82,8 @@ export function createFullCreditNoteApplication({
     }
 
     try {
-      if (!(await pdf.checkFit(candidate))) {
-        return { kind: "invalid", message: "The credit note does not fit the fixed A4 layout." };
+      if (!(await pdf.checkLayout(candidate))) {
+        return { kind: "invalid", message: "The credit note cannot be laid out on A4 pages." };
       }
       const snapshot = createFullCreditNoteSnapshot({
         candidate,

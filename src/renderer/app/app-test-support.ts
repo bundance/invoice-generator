@@ -91,12 +91,12 @@ export const testInvoiceAppCommands = {
   previewFullCreditNote: () =>
     Promise.resolve({
       kind: "ready",
-      preview: { bytes: new Uint8Array([37, 80, 68, 70]), documentId: "Credit note", pageCount: 1 },
+      preview: { bytes: new Uint8Array([37, 80, 68, 70]), documentId: "Credit note" },
     }),
   previewInvoiceDraft: () =>
     Promise.resolve({
       kind: "ready",
-      preview: { bytes: new Uint8Array([37, 80, 68, 70]), documentId: "Draft", pageCount: 1 },
+      preview: { bytes: new Uint8Array([37, 80, 68, 70]), documentId: "Draft" },
     }),
 } satisfies Pick<InvoiceAppBridge, "previewFullCreditNote" | "previewInvoiceDraft">;
 

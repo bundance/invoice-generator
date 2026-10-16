@@ -1,3 +1,4 @@
+import { unusedPdfPreviewMethods } from "../../tests/fixtures/pdf-preview.ts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { persistedClientSchema } from "../domain/clients/client.js";
@@ -266,14 +267,9 @@ function memoryRepository(initialState: WorkspaceState): WorkspaceRepository & {
   };
 }
 
-const unusedPdfPreviewMethods = {
-  preview: () => Promise.reject(new Error("Credit-note preview is not used in this test")),
-  previewDraft: () => Promise.reject(new Error("Invoice preview is not used in this test")),
-} as const;
-
 const successfulInvoicePdf: InvoicePdf = {
   ...unusedPdfPreviewMethods,
-  checkFit: () => Promise.resolve(true),
+  checkLayout: () => Promise.resolve(true),
   prepare: (snapshot) =>
     Promise.resolve({
       bytes: new Uint8Array([37, 80, 68, 70]),
@@ -285,7 +281,7 @@ function openReplacementApplication(
   workspaceRepository: WorkspaceRepository,
   invoicePdf: InvoicePdf = {
     ...unusedPdfPreviewMethods,
-    checkFit: () => Promise.resolve(true),
+    checkLayout: () => Promise.resolve(true),
     prepare: () => Promise.reject(new Error("Invoice PDF preparation failed")),
   },
 ) {
@@ -294,7 +290,7 @@ function openReplacementApplication(
     createClientId: () => completeClient.id,
     creditNotePdf: {
       ...unusedPdfPreviewMethods,
-      checkFit: () => Promise.resolve(true),
+      checkLayout: () => Promise.resolve(true),
       prepare: () => Promise.reject(new Error("Credit-note PDF is not used in this test")),
     },
     currentBusinessDate: () => parseBusinessDate("2026-09-08"),

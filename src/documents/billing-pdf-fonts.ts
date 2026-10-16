@@ -25,7 +25,10 @@ import arimoVietnameseBold from "@fontsource/arimo/files/arimo-vietnamese-700-no
 // react-doctor-disable-next-line react-doctor/prefer-dynamic-import -- This module runs only in the Electron main process.
 import { Font } from "@react-pdf/renderer";
 
-import type { BillingDocumentFontSubset } from "../domain/validation/billing-document-text.ts";
+import {
+  billingDocumentFontSubsets,
+  type BillingDocumentFontSubset,
+} from "../domain/validation/billing-document-text.ts";
 
 const sources = {
   "cyrillic-ext": {
@@ -60,24 +63,15 @@ const sources = {
   Record<BillingDocumentFontSubset, Readonly<{ bold: string; italic: string; regular: string }>>
 >;
 
-const subsetOrder: readonly BillingDocumentFontSubset[] = [
-  "latin",
-  "latin-ext",
-  "vietnamese",
-  "greek",
-  "greek-ext",
-  "cyrillic",
-  "cyrillic-ext",
-  "hebrew",
-];
-
-export const billingPdfFontFamilies = subsetOrder.map((subset) => `Arimo ${subset}`);
+export const billingPdfFontFamilies = billingDocumentFontSubsets.map(
+  ({ name: subset }) => `Arimo ${subset}`,
+);
 
 let fontsRegistered = false;
 
 export function registerBillingPdfFonts(): void {
   if (fontsRegistered) return;
-  for (const subset of subsetOrder) {
+  for (const { name: subset } of billingDocumentFontSubsets) {
     const family = `Arimo ${subset}`;
     Font.register({
       family,

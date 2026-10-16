@@ -18,7 +18,11 @@ Package scripts use the Node.js version in [`.node-version`](../../.node-version
 
 The full gate is the authoritative result. Its stages and time limits live in [`release-plan.ts`](../../src/infrastructure/release-gate/release-plan.ts). It runs quality checks, unit and component tests, the production build, Electron journeys, PDF checks, arm64 DMG packaging, and package inspection.
 
+PDF.js brings an optional native canvas dependency into the packaged dependency tree. Package inspection includes `.node` addons even when they lack executable permissions. Platform detection checks path segments so the target `canvas-darwin-arm64` package is accepted while alternate platform packages remain blocked.
+
 The release runner always starts stages in batch mode with `CI=true` and no standard input. Output remains visible in the terminal. This prevents interactive tools such as React Doctor from suspending under the stage timeout wrappers; callers do not need extra environment variables or input redirection.
+
+The `check:quality` script also sets `CI=true` for React Doctor so direct quality runs finish without keyboard input before continuing to Fallow.
 
 ## Electron permission boundary
 

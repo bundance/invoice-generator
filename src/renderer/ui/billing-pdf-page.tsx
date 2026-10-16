@@ -1,8 +1,9 @@
 import { TextLayer, type PDFDocumentProxy, type PDFPageProxy, type RenderTask } from "pdfjs-dist";
 import { useEffect, useRef } from "react";
+import { describePdfJsError } from "./pdf-js-error.ts";
 
 type BillingPdfPageProps = Readonly<{
-  document: PDFDocumentProxy;
+  pdf: PDFDocumentProxy;
   onError: (message: string) => void;
   onRendered: (pageNumber: number, renderKey: string) => void;
   pageNumber: number;
@@ -11,7 +12,7 @@ type BillingPdfPageProps = Readonly<{
 }>;
 
 export function BillingPdfPage({
-  document,
+  pdf,
   onError,
   onRendered,
   pageNumber,
@@ -29,10 +30,11 @@ export function BillingPdfPage({
     let current = true;
     void (async () => {
       try {
-        page = await document.getPage(pageNumber);
-        const elements = readPageElements(pageRef.current, canvasRef.current, textLayerRef.current);
-        if (!current || !elements) return;
-        const { pageContainer, canvas, textContainer } = elements;
+        page = await pdf.getPage(pageNumber);
+        const pageContainer = pageRef.current;
+        const canvas = canvasRef.current;
+        const textContainer = textLayerRef.current;
+        if (!current || !pageContainer || !canvas || !textContainer) return;
         const viewport = page.getViewport({ scale });
         pageContainer.style.width = `${viewport.width}px`;
         pageContainer.style.height = `${viewport.height}px`;
@@ -69,11 +71,7 @@ export function BillingPdfPage({
         }
       } catch (error: unknown) {
         if (current) {
-          onError(
-            pdfErrorMessage(
-              error instanceof Error ? error : new Error("PDF.js returned an unknown error"),
-            ),
-          );
+          onError(describePdfJsError(error));
         }
       }
     })();
@@ -83,7 +81,7 @@ export function BillingPdfPage({
       textLayer?.cancel();
       page?.cleanup();
     };
-  }, [document, onError, onRendered, pageNumber, renderKey, scale]);
+  }, [pdf, onError, onRendered, pageNumber, renderKey, scale]);
 
   return (
     <div aria-label={`PDF page ${pageNumber}`} className="billing-pdf-preview__page" ref={pageRef}>
@@ -91,25 +89,4 @@ export function BillingPdfPage({
       <div className="textLayer" ref={textLayerRef} />
     </div>
   );
-}
-
-function pdfErrorMessage(error: Error): string {
-  return error.message
-    ? `Could not display the PDF preview: ${error.message}`
-    : "Could not display the PDF preview.";
-}
-
-type PdfPageElements = Readonly<{
-  canvas: HTMLCanvasElement;
-  pageContainer: HTMLDivElement;
-  textContainer: HTMLDivElement;
-}>;
-
-function readPageElements(
-  pageContainer: HTMLDivElement | null,
-  canvas: HTMLCanvasElement | null,
-  textContainer: HTMLDivElement | null,
-): PdfPageElements | null {
-  if (!pageContainer || !canvas || !textContainer) return null;
-  return { canvas, pageContainer, textContainer };
 }

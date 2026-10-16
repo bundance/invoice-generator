@@ -3,10 +3,10 @@ import type {
   InvoiceServiceLineFieldName,
   InvoiceServiceLinePreview,
 } from "../../../domain/invoices/invoice-service-line.ts";
+import type { InvoiceDraftItems } from "./invoice-draft-items.types.ts";
 import { InvoiceItemFields } from "./invoice-item-fields.tsx";
 import { InvoiceItemSummary } from "./invoice-item-summary.tsx";
 import type { InvoiceDraftForm } from "./use-invoice-draft-form.ts";
-import type { InvoiceDraftItems } from "./use-invoice-draft-items.ts";
 
 type InvoiceItemAccordionProps = Readonly<{
   draft: InvoiceDraftInput;

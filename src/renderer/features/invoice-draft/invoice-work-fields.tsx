@@ -4,9 +4,9 @@ import type {
 } from "../../../domain/invoices/invoice-draft.ts";
 import type { InvoiceServiceLineFieldName } from "../../../domain/invoices/invoice-service-line.ts";
 import { FormField } from "../../ui/form-controls.tsx";
-import { InvoiceItemsEditor } from "./invoice-items-editor.tsx";
 import type { InvoiceDraftFieldGroupProps } from "./invoice-draft-field-group.ts";
-import type { InvoiceDraftItems } from "./use-invoice-draft-items.ts";
+import type { InvoiceDraftItems } from "./invoice-draft-items.types.ts";
+import { InvoiceItemsEditor } from "./invoice-items-editor.tsx";
 
 type InvoiceWorkFieldsProps = InvoiceDraftFieldGroupProps &
   Readonly<{

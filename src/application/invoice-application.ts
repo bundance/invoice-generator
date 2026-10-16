@@ -1,3 +1,8 @@
+import {
+  prepareIssueReview,
+  previewWorkspaceInvoiceDraft,
+  type PreparedIssueReview,
+} from "./invoice-review.ts";
 import type { Client, ClientId, ClientInput } from "../domain/clients/client.js";
 import {
   persistedClientSchema,
@@ -9,21 +14,14 @@ import type {
   FullCreditNoteInput,
 } from "../domain/invoices/credit-note.js";
 import type { InvoiceDraftInput, InvoiceIssueInput } from "../domain/invoices/invoice-draft.js";
-import {
-  persistedInvoiceDraftSchema,
-  reviewInvoiceDraft,
-  type InvoiceDraftReview,
-} from "../domain/invoices/invoice-draft.js";
+import { persistedInvoiceDraftSchema } from "../domain/invoices/invoice-draft.js";
 import {
   attachRetainedInvoicePdf,
   createIssuedInvoiceSnapshot,
   type InvoiceId,
 } from "../domain/invoices/issued-invoice.js";
 import type { DocumentId, RetainedDocument } from "../domain/invoices/retained-document.js";
-import {
-  createReplacementDraft as copyReplacementDraft,
-  replacementDraftHasValidSource,
-} from "../domain/invoices/replacement.js";
+import { createReplacementDraft as copyReplacementDraft } from "../domain/invoices/replacement.js";
 import type { IssuerSettings } from "../domain/issuer/issuer-settings.js";
 import {
   defaultBusinessTimezone,
@@ -131,6 +129,16 @@ export async function openInvoiceApplication({
   });
   // IPC calls can overlap. Sequence writes so each change starts from the state left by the last.
   let pendingMutation = Promise.resolve();
+
+  async function readWorkspace(): Promise<
+    | Readonly<{ kind: "ready"; workspace: WorkspaceState }>
+    | Readonly<{ kind: "failed"; message: string }>
+  > {
+    await pendingMutation;
+    return applicationState.kind === "ready"
+      ? applicationState
+      : { kind: "failed", message: "The local workspace is unavailable." };
+  }
 
   async function loadWorkspace(): Promise<WorkspaceLoadResult> {
     await pendingMutation;
@@ -288,17 +296,15 @@ export async function openInvoiceApplication({
   }
 
   async function reviewInvoiceIssue(input: InvoiceDraftInput): Promise<InvoiceIssueReviewResult> {
-    await pendingMutation;
-    if (applicationState.kind === "recovery-required") {
-      return { kind: "failed", message: "The local workspace is unavailable." };
-    }
+    const result = await readWorkspace();
+    if (result.kind === "failed") return result;
 
-    const reviewResult = prepareIssueReview(applicationState.workspace, input, currentBusinessDate);
+    const reviewResult = prepareIssueReview(result.workspace, input, currentBusinessDate);
     if (reviewResult.kind === "invalid") return reviewResult;
 
     try {
-      if (!(await invoicePdf.checkFit(reviewResult.review.candidate))) {
-        return { kind: "invalid", message: "The invoice does not fit the fixed A4 layout." };
+      if (!(await invoicePdf.checkLayout(reviewResult.review.candidate))) {
+        return { kind: "invalid", message: "The invoice cannot be laid out on A4 pages." };
       }
     } catch {
       return { kind: "failed", message: "Could not check the final invoice layout." };
@@ -312,12 +318,10 @@ export async function openInvoiceApplication({
   }
 
   async function findRetainedDocument(documentId: DocumentId): Promise<RetainedDocumentResult> {
-    await pendingMutation;
-    if (applicationState.kind === "recovery-required") {
-      return { kind: "failed", message: "The local workspace is unavailable." };
-    }
-    const invoice = applicationState.workspace.issuedInvoices.find(({ id }) => id === documentId);
-    const creditNote = applicationState.workspace.creditNotes.find(({ id }) => id === documentId);
+    const result = await readWorkspace();
+    if (result.kind === "failed") return result;
+    const invoice = result.workspace.issuedInvoices.find(({ id }) => id === documentId);
+    const creditNote = result.workspace.creditNotes.find(({ id }) => id === documentId);
     const document: RetainedDocument | undefined = invoice
       ? { kind: "issued-invoice", record: invoice }
       : creditNote
@@ -338,45 +342,21 @@ export async function openInvoiceApplication({
   async function reviewFullCreditNote(
     input: FullCreditNoteInput,
   ): Promise<FullCreditNoteReviewResult> {
-    await pendingMutation;
-    if (applicationState.kind === "recovery-required") {
-      return { kind: "failed", message: "The local workspace is unavailable." };
-    }
-    return fullCreditNotes.review(applicationState.workspace, input);
+    const result = await readWorkspace();
+    if (result.kind === "failed") return result;
+    return fullCreditNotes.review(result.workspace, input);
   }
 
   async function previewInvoiceDraft(input: InvoiceDraftInput): Promise<PdfPreviewResult> {
-    await pendingMutation;
-    if (applicationState.kind === "recovery-required") {
-      return { kind: "failed", message: "The local workspace is unavailable." };
-    }
-    const workspace = applicationState.workspace;
-    if (!workspace.issuer) {
-      return { kind: "invalid", message: "Complete company settings to preview an invoice." };
-    }
-    const client = workspace.clients.find(({ id }) => id === input.clientId);
-    const review = reviewInvoiceDraft({
-      client,
-      draft: input,
-      issuer: workspace.issuer,
-      today: currentBusinessDate(workspace.issuer.businessTimezone),
-    });
-    try {
-      return {
-        kind: "ready",
-        preview: await invoicePdf.previewDraft(workspace.issuer, review),
-      };
-    } catch {
-      return { kind: "failed", message: "Could not prepare the invoice preview." };
-    }
+    const result = await readWorkspace();
+    if (result.kind === "failed") return result;
+    return previewWorkspaceInvoiceDraft(result.workspace, input, invoicePdf, currentBusinessDate);
   }
 
   async function previewFullCreditNote(input: FullCreditNoteInput): Promise<PdfPreviewResult> {
-    await pendingMutation;
-    if (applicationState.kind === "recovery-required") {
-      return { kind: "failed", message: "The local workspace is unavailable." };
-    }
-    return fullCreditNotes.preview(applicationState.workspace, input);
+    const result = await readWorkspace();
+    if (result.kind === "failed") return result;
+    return fullCreditNotes.preview(result.workspace, input);
   }
 
   function issueFullCreditNote(
@@ -401,8 +381,8 @@ export async function openInvoiceApplication({
     reviewResult: Extract<PreparedIssueReview, { kind: "ready" }>,
   ): Promise<InvoiceIssueResult> {
     try {
-      if (!(await invoicePdf.checkFit(reviewResult.review.candidate))) {
-        return { kind: "invalid", message: "The invoice does not fit the fixed A4 layout." };
+      if (!(await invoicePdf.checkLayout(reviewResult.review.candidate))) {
+        return { kind: "invalid", message: "The invoice cannot be laid out on A4 pages." };
       }
 
       const snapshot = createIssuedInvoiceSnapshot({
@@ -550,14 +530,6 @@ export async function openInvoiceApplication({
   };
 }
 
-type PreparedIssueReview =
-  | Readonly<{
-      kind: "ready";
-      client: Client;
-      review: InvoiceDraftReview & { candidate: NonNullable<InvoiceDraftReview["candidate"]> };
-    }>
-  | Readonly<{ kind: "invalid"; message: string }>;
-
 function validateIssueConfirmation(
   reviewResult: Extract<PreparedIssueReview, { kind: "ready" }>,
   input: InvoiceIssueInput,
@@ -572,38 +544,6 @@ function validateIssueConfirmation(
     return { kind: "invalid", message: "Confirm that you checked the tax point." };
   }
   return null;
-}
-
-function prepareIssueReview(
-  workspace: WorkspaceState,
-  input: InvoiceDraftInput,
-  currentBusinessDate: (businessTimezone: BusinessTimezone) => BusinessDate,
-): PreparedIssueReview {
-  const draftResult = persistedInvoiceDraftSchema.safeParse(input);
-  if (!draftResult.success || !workspace.issuer) {
-    return { kind: "invalid", message: "The invoice draft is not ready to issue." };
-  }
-  const client = workspace.clients.find(({ id }) => id === draftResult.data.clientId);
-  const review = reviewInvoiceDraft({
-    client,
-    draft: draftResult.data,
-    issuer: workspace.issuer,
-    today: currentBusinessDate(workspace.issuer.businessTimezone),
-  });
-  if (!client || !review.candidate || review.errors.length > 0) {
-    return { kind: "invalid", message: "The invoice draft is not ready to issue." };
-  }
-  if (workspace.issuedInvoices.some(({ id }) => id === review.candidate?.proposedInvoiceId)) {
-    return { kind: "invalid", message: "The next invoice ID is already in use." };
-  }
-  if (!replacementDraftHasValidSource(workspace)) {
-    return { kind: "invalid", message: "The replacement link is no longer valid." };
-  }
-  return {
-    kind: "ready",
-    client,
-    review: { ...review, candidate: review.candidate },
-  };
 }
 
 function keepQueueRunning<Result>(mutation: Promise<Result>): Promise<void> {

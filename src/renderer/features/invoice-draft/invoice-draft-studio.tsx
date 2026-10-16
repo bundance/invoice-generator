@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useWatch } from "react-hook-form";
 
 import type { InvoiceIssueResult } from "../../../application/invoice-application-contract.ts";
@@ -9,11 +8,11 @@ import {
 } from "../../../domain/invoices/invoice-draft.ts";
 import type { IssuerSettings } from "../../../domain/issuer/issuer-settings.ts";
 import type { BusinessDate } from "../../../domain/time/business-date.ts";
-import type { BillingPdfPreviewReadiness } from "../../ui/billing-pdf-preview.tsx";
+import { BillingPdfPreview } from "../../ui/billing-pdf-preview.tsx";
+import { useBillingPdfPreview } from "../../hooks/use-billing-pdf-preview.ts";
 import { DraftRecoveryDialog } from "./draft-recovery-dialog.tsx";
 import { InvoiceDraftInspector } from "./invoice-draft-inspector.tsx";
 import { InvoiceDraftLayout } from "./invoice-draft-layout.tsx";
-import { InvoicePreview } from "./invoice-preview.tsx";
 import type { InvoiceDraftForm } from "./use-invoice-draft-form.ts";
 import type { ReplacementDraftNoticeValues } from "./replacement-draft-notice.tsx";
 
@@ -38,11 +37,8 @@ export function InvoiceDraftStudio({
   recoveryRequired,
   replacementNotice,
 }: InvoiceDraftStudioProps) {
-  const [previewReadiness, setPreviewReadiness] = useState<BillingPdfPreviewReadiness | null>(null);
   const draft = parseInvoiceDraftInput(useWatch({ control: draftForm.control }));
-  const previewRequestKey = JSON.stringify(draft);
-  const previewIsReady =
-    previewReadiness?.requestKey === previewRequestKey && previewReadiness.ready;
+  const preview = useBillingPdfPreview({ kind: "invoice", input: draft });
   const selectedClient = clients.find(({ id }) => id === draft.clientId);
   const review = reviewInvoiceDraft({
     client: selectedClient,
@@ -60,13 +56,7 @@ export function InvoiceDraftStudio({
   return (
     <>
       <InvoiceDraftLayout
-        preview={
-          <InvoicePreview
-            draft={draft}
-            onReadyChange={setPreviewReadiness}
-            requestKey={previewRequestKey}
-          />
-        }
+        preview={<BillingPdfPreview ariaLabel="Invoice preview" preview={preview} />}
         editor={
           <InvoiceDraftInspector
             clients={clients}
@@ -74,7 +64,7 @@ export function InvoiceDraftStudio({
             draftForm={draftForm}
             onDiscard={discardDraft}
             onIssued={onIssued}
-            previewIsReady={previewIsReady}
+            previewIsReady={preview.state.kind === "displayed"}
             review={review}
             selectedClient={selectedClient}
             replacementNotice={replacementNotice}
