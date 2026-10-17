@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
@@ -13,7 +13,11 @@ import {
   completeIssuedInvoice,
 } from "../../../../tests/fixtures/issued-invoice.js";
 import { completeIssuer } from "../../../../tests/fixtures/issuer-settings.js";
-import { businessDate, unusedInvoiceAppCommands } from "../../app/app-test-support.js";
+import {
+  businessDate,
+  renderAppForTest,
+  testInvoiceAppCommands,
+} from "../../app/app-test-support.js";
 import App from "../../app/app.js";
 
 describe("invoice history", () => {
@@ -31,7 +35,7 @@ describe("invoice history", () => {
       legalName: "Current issuer settings",
     });
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       exportRetainedDocument: (invoiceId) => {
         actions.push(`export:${invoiceId}`);
         return Promise.resolve({ kind: "completed" });
@@ -60,7 +64,7 @@ describe("invoice history", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Invoices" }));
     const record = screen.getByRole("article", { name: "Invoice GGIOHK-0043" });
@@ -92,7 +96,7 @@ describe("invoice history", () => {
       );
     };
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       exportRetainedDocument: () => runAction("export"),
       issueInvoice: () => {
         issueCount += 1;
@@ -116,7 +120,7 @@ describe("invoice history", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Invoices" }));
     const record = screen.getByRole("article", { name: "Invoice GGIOHK-0043" });
@@ -168,7 +172,7 @@ describe("invoice history", () => {
     });
     const openedDocuments: string[] = [];
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -189,7 +193,7 @@ describe("invoice history", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Invoices" }));
     const chain = screen.getByRole("region", { name: "Correction chain from GGIOHK-0043" });

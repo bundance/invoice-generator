@@ -10,6 +10,7 @@ import type { BusinessDate } from "../domain/time/business-date.ts";
 import type {
   FullCreditNoteIssueResult,
   FullCreditNoteReviewResult,
+  PdfPreviewResult,
 } from "./invoice-application-contract.ts";
 import type { CreditNotePdf, WorkspaceRepository, WorkspaceState } from "./workspace.ts";
 
@@ -29,6 +30,7 @@ export type FullCreditNoteApplication = Readonly<{
     workspace: WorkspaceState,
     input: FullCreditNoteInput,
   ) => Promise<FullCreditNoteReviewResult>;
+  preview: (workspace: WorkspaceState, input: FullCreditNoteInput) => Promise<PdfPreviewResult>;
 }>;
 
 export type FullCreditNoteMutationResult =
@@ -53,9 +55,9 @@ export function createFullCreditNoteApplication({
     if (result.kind === "invalid") return result;
 
     try {
-      return (await pdf.checkFit(result.candidate))
+      return (await pdf.checkLayout(result.candidate))
         ? result
-        : { kind: "invalid", message: "The credit note does not fit the fixed A4 layout." };
+        : { kind: "invalid", message: "The credit note cannot be laid out on A4 pages." };
     } catch {
       return { kind: "failed", message: "Could not check the final credit-note layout." };
     }
@@ -80,8 +82,8 @@ export function createFullCreditNoteApplication({
     }
 
     try {
-      if (!(await pdf.checkFit(candidate))) {
-        return { kind: "invalid", message: "The credit note does not fit the fixed A4 layout." };
+      if (!(await pdf.checkLayout(candidate))) {
+        return { kind: "invalid", message: "The credit note cannot be laid out on A4 pages." };
       }
       const snapshot = createFullCreditNoteSnapshot({
         candidate,
@@ -107,7 +109,20 @@ export function createFullCreditNoteApplication({
     }
   }
 
-  return { issue, review };
+  async function preview(
+    workspace: WorkspaceState,
+    input: FullCreditNoteInput,
+  ): Promise<PdfPreviewResult> {
+    const result = prepareReview(workspace, input, currentBusinessDate);
+    if (result.kind === "invalid") return result;
+    try {
+      return { kind: "ready", preview: await pdf.preview(result.candidate) };
+    } catch {
+      return { kind: "failed", message: "Could not prepare the credit-note preview." };
+    }
+  }
+
+  return { issue, preview, review };
 }
 
 type PreparedReview = Extract<FullCreditNoteReviewResult, { kind: "ready" | "invalid" }>;

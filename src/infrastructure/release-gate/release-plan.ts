@@ -31,7 +31,7 @@ export const releaseStages = [
   },
   {
     command:
-      "timeout 60 vp run check:test-policy && timeout 300 vp test run src/domain src/application src/infrastructure/persistence src/infrastructure/testing src/infrastructure/release-gate --allowOnly=false --retry=0 --reporter=json --outputFile=test-results/domain-persistence.json",
+      "timeout 60 vp run check:test-policy && timeout 300 vp test run src/domain src/application src/infrastructure/persistence src/infrastructure/testing src/infrastructure/release-gate src/infrastructure/electron/billing-pdf-engine.test.tsx src/infrastructure/electron/invoice-pdf.test.ts --allowOnly=false --retry=0 --reporter=json --outputFile=test-results/domain-persistence.json",
     id: "domain-persistence",
     name: "domain and persistence tests",
     result: { kind: "vitest", path: "test-results/domain-persistence.json" },
@@ -57,7 +57,7 @@ export const releaseStages = [
   },
   {
     command:
-      'timeout 300 env PLAYWRIGHT_JSON_OUTPUT_FILE=test-results/pdf.json playwright test --project=pdf --grep "GBP UK VAT invoice|foreign-currency UK VAT invoice|multi-item invoice" --reporter=line,json',
+      'timeout 300 env PLAYWRIGHT_JSON_OUTPUT_FILE=test-results/pdf.json playwright test --project=pdf --grep "GBP UK VAT invoice|foreign-currency UK VAT invoice|30-row invoice|multi-item invoice" --reporter=line,json',
     id: "pdf",
     name: "PDF verification",
     result: { kind: "playwright", path: "test-results/pdf.json" },
@@ -195,6 +195,7 @@ export const automatedChecks = [
     "pdf",
     [
       "GBP UK VAT invoice keeps exact tax facts",
+      "30-row invoice and full credit note retain every multi-page PDF page",
       "multi-item invoice recovers, credits, replaces, and retains exact PDFs",
     ],
   ),
@@ -205,6 +206,7 @@ export const automatedChecks = [
     [
       "GBP UK VAT invoice keeps exact tax facts",
       "foreign-currency UK VAT invoice retains sterling evidence",
+      "30-row invoice and full credit note retain every multi-page PDF page",
       "multi-item invoice recovers, credits, replaces, and retains exact PDFs",
     ],
   ),

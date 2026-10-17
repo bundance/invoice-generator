@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import tailwindcss from "@tailwindcss/vite";
@@ -6,6 +8,8 @@ import electron from "vite-plugin-electron/simple";
 import { defineConfig } from "vite-plus";
 
 const toolIgnores = [".agents/**", ".codex/**", ".scratch/**", "tools/oxlint/anti-slop/**"];
+const rendererRequire = createRequire(import.meta.resolve("@react-pdf/renderer"));
+const pdfkitBrowserPath = join(dirname(rendererRequire.resolve("pdfkit")), "pdfkit.browser.js");
 
 export default defineConfig({
   plugins: [
@@ -21,6 +25,7 @@ export default defineConfig({
               fileName: () => "main.cjs",
             },
           },
+          resolve: { alias: { pdfkit: pdfkitBrowserPath } },
         },
       },
       preload: { input: "src/infrastructure/electron/preload.ts" },
@@ -29,6 +34,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      pdfkit: pdfkitBrowserPath,
     },
   },
   fmt: {

@@ -8,12 +8,11 @@ import {
 } from "../../../domain/invoices/invoice-draft.ts";
 import type { IssuerSettings } from "../../../domain/issuer/issuer-settings.ts";
 import type { BusinessDate } from "../../../domain/time/business-date.ts";
-import { billingDocumentFonts } from "../../../documents/billing-document-fonts.ts";
-import { BillingDocumentFontGate } from "../../ui/billing-document-font-gate.tsx";
+import { BillingPdfPreview } from "../../ui/billing-pdf-preview.tsx";
+import { useBillingPdfPreview } from "../../hooks/use-billing-pdf-preview.ts";
 import { DraftRecoveryDialog } from "./draft-recovery-dialog.tsx";
 import { InvoiceDraftInspector } from "./invoice-draft-inspector.tsx";
 import { InvoiceDraftLayout } from "./invoice-draft-layout.tsx";
-import { InvoicePreview } from "./invoice-preview.tsx";
 import type { InvoiceDraftForm } from "./use-invoice-draft-form.ts";
 import type { ReplacementDraftNoticeValues } from "./replacement-draft-notice.tsx";
 
@@ -39,6 +38,7 @@ export function InvoiceDraftStudio({
   replacementNotice,
 }: InvoiceDraftStudioProps) {
   const draft = parseInvoiceDraftInput(useWatch({ control: draftForm.control }));
+  const preview = useBillingPdfPreview({ kind: "invoice", input: draft });
   const selectedClient = clients.find(({ id }) => id === draft.clientId);
   const review = reviewInvoiceDraft({
     client: selectedClient,
@@ -54,35 +54,26 @@ export function InvoiceDraftStudio({
   }
 
   return (
-    <BillingDocumentFontGate fonts={billingDocumentFonts}>
-      {(fontReadiness) => (
-        <>
-          <InvoiceDraftLayout
-            preview={
-              <InvoicePreview fontReadiness={fontReadiness} issuer={issuer} review={review} />
-            }
-            editor={
-              <InvoiceDraftInspector
-                clients={clients}
-                draft={draft}
-                draftForm={draftForm}
-                onDiscard={discardDraft}
-                onIssued={onIssued}
-                previewIsReady={fontReadiness.status === "ready"}
-                review={review}
-                selectedClient={selectedClient}
-                replacementNotice={replacementNotice}
-              />
-            }
+    <>
+      <InvoiceDraftLayout
+        preview={<BillingPdfPreview ariaLabel="Invoice preview" preview={preview} />}
+        editor={
+          <InvoiceDraftInspector
+            clients={clients}
+            draft={draft}
+            draftForm={draftForm}
+            onDiscard={discardDraft}
+            onIssued={onIssued}
+            previewIsReady={preview.state.kind === "displayed"}
+            review={review}
+            selectedClient={selectedClient}
+            replacementNotice={replacementNotice}
           />
-          {recoveryRequired ? (
-            <DraftRecoveryDialog
-              onDiscard={() => void discardDraft()}
-              onResume={onRecoveryResolved}
-            />
-          ) : null}
-        </>
-      )}
-    </BillingDocumentFontGate>
+        }
+      />
+      {recoveryRequired ? (
+        <DraftRecoveryDialog onDiscard={() => void discardDraft()} onResume={onRecoveryResolved} />
+      ) : null}
+    </>
   );
 }

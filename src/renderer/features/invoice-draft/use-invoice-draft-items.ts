@@ -71,5 +71,3 @@ export function useInvoiceDraftItems({ draftForm, selectedClient }: UseInvoiceDr
     openItem: setActiveFieldId,
   };
 }
-
-export type InvoiceDraftItems = ReturnType<typeof useInvoiceDraftItems>;

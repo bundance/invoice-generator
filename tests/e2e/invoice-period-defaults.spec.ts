@@ -47,25 +47,37 @@ test("invoice periods suggest editable weeks and keep the date range together", 
     );
 
     const preview = page.getByLabel("Invoice preview");
-    await expect(preview).toHaveAttribute("data-font-status", "ready");
-    const dateRange = preview.locator(".service-period-dates").first();
-    await expect(dateRange).toHaveText("2026-08-03 - 2026-08-12");
+    await expect(preview.locator(".billing-pdf-preview__page canvas").first()).toBeVisible();
+    const dateRange = preview
+      .locator(".textLayer span")
+      .filter({ hasText: "Invoice period: 2026-08-03 - 2026-08-12" });
+    await expect(dateRange).toBeVisible();
+    await expect(dateRange).toHaveText("Invoice period: 2026-08-03 - 2026-08-12");
     const layout = await dateRange.evaluate((element) => {
       const range = document.createRange();
       range.selectNodeContents(element);
       const lineTops = [...new Set(Array.from(range.getClientRects(), (rect) => rect.top))];
-      const label = element.previousElementSibling?.previousElementSibling;
-      const parent = element.parentElement;
-      if (!label || !parent) throw new Error("Expected the period label and description cell");
+      const pdfPage = element.closest(".billing-pdf-preview__page");
+      if (!pdfPage) throw new Error("Expected the generated PDF page");
+      const textBox = element.getBoundingClientRect();
+      const pageBox = pdfPage.getBoundingClientRect();
       return {
-        dateTop: element.getBoundingClientRect().top,
-        labelBottom: label.getBoundingClientRect().bottom,
         lineCount: lineTops.length,
-        fits: element.getBoundingClientRect().right <= parent.getBoundingClientRect().right,
+        fits: textBox.left >= pageBox.left && textBox.right <= pageBox.right,
       };
     });
+    const description = preview
+      .locator(".textLayer span")
+      .filter({ hasText: /^Project delivery$/u })
+      .first();
+    const [dateBox, descriptionBox] = await Promise.all([
+      dateRange.boundingBox(),
+      description.boundingBox(),
+    ]);
+    if (!dateBox || !descriptionBox)
+      throw new Error("Expected the generated service description and period");
+    expect(dateBox.y).toBeGreaterThanOrEqual(descriptionBox.y + descriptionBox.height - 1);
     expect(layout.lineCount).toBe(1);
-    expect(layout.dateTop).toBeGreaterThanOrEqual(layout.labelBottom);
     expect(layout.fits).toBe(true);
     await expect(page.getByText("Saved on this Mac")).toBeVisible();
   } finally {

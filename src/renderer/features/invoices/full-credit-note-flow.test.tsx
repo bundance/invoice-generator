@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
@@ -14,32 +14,18 @@ import {
 } from "../../../../tests/fixtures/issued-invoice.js";
 import { completeIssuer } from "../../../../tests/fixtures/issuer-settings.js";
 import {
-  createLoadedTestDocumentFonts,
-  createTestDocumentFonts,
-  setTestDocumentFonts,
-} from "../../../../tests/fixtures/test-document-fonts.js";
-import { businessDate, deferred, unusedInvoiceAppCommands } from "../../app/app-test-support.js";
+  businessDate,
+  renderAppForTest,
+  testInvoiceAppCommands,
+} from "../../app/app-test-support.js";
 import App from "../../app/app.js";
 
 describe("full credit note flow", () => {
-  afterEach(() => {
-    cleanup();
-    setTestDocumentFonts(createLoadedTestDocumentFonts());
-  });
+  afterEach(cleanup);
 
-  it("keeps credit-note review unavailable until the visible preview fonts are ready", async () => {
-    const fontLoad = deferred<void>();
-    setTestDocumentFonts(
-      createTestDocumentFonts({
-        load: async (face) => {
-          await fontLoad.promise;
-          face.status = "loaded";
-        },
-        status: "unloaded",
-      }),
-    );
+  it("keeps credit-note review unavailable until the generated PDF is rendered", async () => {
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -56,7 +42,7 @@ describe("full credit note flow", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Invoices" }));
     const original = screen.getByRole("article", { name: "Invoice GGIOHK-0043" });
@@ -68,9 +54,7 @@ describe("full credit note flow", () => {
 
     const reviewButton = screen.getByRole("button", { name: "Review and issue credit note" });
     expect(reviewButton).toBeDisabled();
-    expect(screen.getByText("Preparing document fonts…")).toBeVisible();
-
-    fontLoad.resolve();
+    expect(screen.getByText("Preparing generated PDF…")).toBeVisible();
 
     await waitFor(() => expect(reviewButton).toBeEnabled());
     expect(screen.getByLabelText("Correction reason")).toHaveValue(
@@ -91,7 +75,7 @@ describe("full credit note flow", () => {
     });
     if (review.kind !== "ready") throw new Error("Expected a ready credit-note fixture");
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       issueFullCreditNote: (input) => {
         issueInputs.push({
           id: input.candidate.id,
@@ -120,7 +104,7 @@ describe("full credit note flow", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Invoices" }));
     const original = screen.getByRole("article", { name: "Invoice GGIOHK-0043" });
@@ -133,8 +117,11 @@ describe("full credit note flow", () => {
       screen.getByLabelText("Correction reason"),
       "The billed service period was incorrect.",
     );
-    expect(screen.getByLabelText("Credit note preview")).toHaveTextContent("USD -2,900.00");
+    await screen.findByLabelText("Rendered PDF pages");
 
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Review and issue credit note" })).toBeEnabled(),
+    );
     await user.click(screen.getByRole("button", { name: "Review and issue credit note" }));
     let dialog = screen.getByRole("dialog", { name: "Issue credit note CN-GGIOHK-0043?" });
     expect(dialog).toHaveTextContent("GGIOHK-0043");
@@ -183,7 +170,7 @@ describe("full credit note flow", () => {
     });
     const requestedOriginals: string[] = [];
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       createReplacementDraft: (originalInvoiceId) => {
         requestedOriginals.push(originalInvoiceId);
         return Promise.resolve({ kind: "created", ...replacement });
@@ -204,7 +191,7 @@ describe("full credit note flow", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Invoices" }));
     await user.click(screen.getByRole("button", { name: "View chain for GGIOHK-0043" }));
@@ -228,7 +215,7 @@ describe("full credit note flow", () => {
     let createAttempts = 0;
     let replacementAttempts = 0;
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       createReplacementDraft: () => {
         createAttempts += 1;
         return Promise.resolve({
@@ -256,7 +243,7 @@ describe("full credit note flow", () => {
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Invoices" }));
     await user.click(screen.getByRole("button", { name: "View chain for GGIOHK-0043" }));

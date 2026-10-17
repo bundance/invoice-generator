@@ -4,7 +4,11 @@ import type {
   CreditNoteSnapshot,
   FullCreditNoteCandidate,
 } from "../domain/invoices/credit-note.ts";
-import type { InvoiceDraft, InvoiceCandidate } from "../domain/invoices/invoice-draft.ts";
+import type {
+  InvoiceDraft,
+  InvoiceCandidate,
+  InvoiceDraftReview,
+} from "../domain/invoices/invoice-draft.ts";
 import type { IssuedInvoice, IssuedInvoiceSnapshot } from "../domain/invoices/issued-invoice.ts";
 import type { RetainedDocument } from "../domain/invoices/retained-document.ts";
 import type { ReplacementDraft } from "../domain/invoices/replacement.ts";
@@ -78,12 +82,19 @@ export type PreparedDocumentPdf = Readonly<{
   pdf: Readonly<{ filename: string; sha256: string }>;
 }>;
 
+export type PdfPreview = Readonly<{
+  bytes: Uint8Array;
+  documentId: string;
+}>;
+
 export type InvoicePdf = Readonly<{
-  checkFit: (candidate: InvoiceCandidate) => Promise<boolean>;
+  checkLayout: (candidate: InvoiceCandidate) => Promise<boolean>;
   prepare: (snapshot: IssuedInvoiceSnapshot) => Promise<PreparedDocumentPdf>;
+  preview: (issuer: IssuerSettings, review: InvoiceDraftReview) => Promise<PdfPreview>;
 }>;
 
 export type CreditNotePdf = Readonly<{
-  checkFit: (candidate: FullCreditNoteCandidate) => Promise<boolean>;
+  checkLayout: (candidate: FullCreditNoteCandidate) => Promise<boolean>;
   prepare: (snapshot: CreditNoteSnapshot) => Promise<PreparedDocumentPdf>;
+  preview: (candidate: FullCreditNoteCandidate) => Promise<PdfPreview>;
 }>;

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 
@@ -12,7 +12,8 @@ import {
   type Deferred,
   emptyWorkspace,
   savedIssuerSettings,
-  unusedInvoiceAppCommands,
+  renderAppForTest,
+  testInvoiceAppCommands,
 } from "./app-test-support.ts";
 
 describe("empty workspace", () => {
@@ -20,7 +21,7 @@ describe("empty workspace", () => {
 
   beforeEach(() => {
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () => Promise.resolve(emptyWorkspace),
       saveIssuerSettings: () => Promise.resolve({ kind: "saved", issuer: completeIssuer }),
     };
@@ -28,7 +29,7 @@ describe("empty workspace", () => {
 
   it("shows every Document studio destination and its next workspace step", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     expect(await screen.findByRole("heading", { level: 1, name: "Create invoice" })).toBeVisible();
     expect(screen.getByLabelText("Invoice preview")).toBeVisible();
@@ -57,7 +58,7 @@ describe("empty workspace", () => {
   it("autosaves complete issuer settings for future documents", async () => {
     const savedInputs: IssuerSettingsInput[] = [];
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () => Promise.resolve(emptyWorkspace),
       saveIssuerSettings: (issuerInput) => {
         savedInputs.push(issuerInput);
@@ -67,7 +68,7 @@ describe("empty workspace", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     await user.type(screen.getByLabelText("Legal name"), completeIssuerInput.legalName);
@@ -96,7 +97,7 @@ describe("empty workspace", () => {
   it("flushes a pending autosave once when the owner saves now", async () => {
     const savedInputs: IssuerSettingsInput[] = [];
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () => Promise.resolve(emptyWorkspace),
       saveIssuerSettings: (issuerInput) => {
         savedInputs.push(issuerInput);
@@ -104,7 +105,7 @@ describe("empty workspace", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     await user.type(screen.getByLabelText("Legal name"), completeIssuerInput.legalName);
@@ -135,7 +136,7 @@ describe("empty workspace", () => {
     const savedInputs: IssuerSettingsInput[] = [];
     const pendingSaves: Array<Deferred<IssuerSettingsSaveResult>> = [];
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -157,7 +158,7 @@ describe("empty workspace", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     const legalName = screen.getByLabelText("Legal name");
@@ -189,7 +190,7 @@ describe("empty workspace", () => {
     const savedInputs: IssuerSettingsInput[] = [];
     const pendingSave = deferred<IssuerSettingsSaveResult>();
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -209,7 +210,7 @@ describe("empty workspace", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     const legalName = screen.getByLabelText("Legal name");
@@ -232,7 +233,7 @@ describe("empty workspace", () => {
     const savedInputs: IssuerSettingsInput[] = [];
     const pendingSave = deferred<IssuerSettingsSaveResult>();
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -252,7 +253,7 @@ describe("empty workspace", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     const legalName = screen.getByLabelText("Legal name");
@@ -275,7 +276,7 @@ describe("empty workspace", () => {
   it("finishes a pending settings save after navigating away", async () => {
     const savedInputs: IssuerSettingsInput[] = [];
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -295,7 +296,7 @@ describe("empty workspace", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     const legalName = screen.getByLabelText("Legal name");
@@ -311,7 +312,7 @@ describe("empty workspace", () => {
 
   it("reveals field errors after blur or save and updates them during correction", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     expect(screen.queryByText("Enter a nine-digit UK VAT registration number.")).toBeNull();
@@ -338,7 +339,7 @@ describe("empty workspace", () => {
     const savedInputs: IssuerSettingsInput[] = [];
     let writeShouldFail = true;
     window.invoiceApp = {
-      ...unusedInvoiceAppCommands,
+      ...testInvoiceAppCommands,
       loadWorkspace: () =>
         Promise.resolve({
           kind: "ready",
@@ -361,7 +362,7 @@ describe("empty workspace", () => {
       },
     };
     const user = userEvent.setup();
-    render(<App />);
+    renderAppForTest(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     const legalName = screen.getByLabelText("Legal name");

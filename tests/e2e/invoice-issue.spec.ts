@@ -10,11 +10,6 @@ import { persistedClientSchema } from "../../src/domain/clients/client.js";
 import { persistedInvoiceDraftSchema } from "../../src/domain/invoices/invoice-draft.js";
 import { persistedIssuerSettingsSchema } from "../../src/domain/issuer/issuer-settings.js";
 import {
-  billingDocumentMeasurementsSchema,
-  collectBillingDocumentMeasurements,
-  evaluateBillingDocumentFit,
-} from "../../src/documents/document-fit.js";
-import {
   parseWorkspaceState,
   serializeWorkspaceState,
 } from "../../src/infrastructure/persistence/workspace-state.js";
@@ -35,7 +30,7 @@ import {
 } from "./support/electron-test-app.js";
 import { verifyRetainedInvoicePdf } from "./support/retained-pdf-verification.js";
 
-const pdfBaselineDirectory = join(import.meta.dirname, "../baselines/pdf");
+const pdfBaselineDirectory = join(import.meta.dirname, "../baselines/pdf/react-pdf");
 
 test("a GBP UK VAT invoice keeps exact tax facts and retained evidence after restart", async ({
   browserName: _browserName,
@@ -69,7 +64,7 @@ test("a GBP UK VAT invoice keeps exact tax facts and retained evidence after res
     await expect(preview).toContainText("GBP 2,900.00");
     await expect(preview).toContainText("GBP 580.00");
     await expect(preview).toContainText("GBP 3,480.00");
-    await expect(preview.getByRole("row", { name: /20%/u })).toBeVisible();
+    await expect(preview).toContainText("20%");
     await expect(preview).toContainText("Tax point: 2026-09-05");
     await expectPreviewFits(preview);
 
@@ -124,7 +119,7 @@ test("a GBP UK VAT invoice keeps exact tax facts and retained evidence after res
     });
     const retainedPdfPath = join(userDataPath, "retained-pdfs", invoice.retainedPdf.filename);
     await verifyRetainedInvoicePdf({
-      rasterBaselinePath: join(pdfBaselineDirectory, "gbp-vat-invoice-144dpi.png"),
+      rasterBaselinePaths: [join(pdfBaselineDirectory, "gbp-vat-invoice-page-1-144dpi.png")],
       pdfPath: retainedPdfPath,
       requiredText: [
         "INVOICE ACME-0008",
@@ -252,14 +247,16 @@ test("a foreign-currency UK VAT invoice retains sterling evidence and exact PDF 
       invoice.retainedPdf.sha256,
     );
     await verifyRetainedInvoicePdf({
-      rasterBaselinePath: join(pdfBaselineDirectory, "foreign-currency-vat-invoice-144dpi.png"),
+      rasterBaselinePaths: [
+        join(pdfBaselineDirectory, "foreign-currency-vat-invoice-page-1-144dpi.png"),
+      ],
       pdfPath: retainedPdfPath,
       requiredText: [
         "INVOICE USDVAT-0012",
         "Acme Research US",
         "USD 2,900.00",
         "USD 580.00",
-        "VAT AMOUNTS IN STERLING",
+        "VAT amounts in sterling",
         "GBP 2,320.00",
         "GBP 464.00",
         "1 GBP = 1.25 USD",
@@ -277,15 +274,14 @@ test("a foreign-currency UK VAT invoice retains sterling evidence and exact PDF 
       creditNote.retainedPdf.sha256,
     );
     await verifyRetainedInvoicePdf({
-      rasterBaselinePath: join(
-        pdfBaselineDirectory,
-        "foreign-currency-full-credit-note-144dpi.png",
-      ),
+      rasterBaselinePaths: [
+        join(pdfBaselineDirectory, "foreign-currency-full-credit-note-page-1-144dpi.png"),
+      ],
       pdfPath: creditNotePdfPath,
       requiredText: [
         "CREDIT NOTE CN-USDVAT-0012",
         "USD -3,480.00",
-        "VAT AMOUNTS IN STERLING",
+        "VAT amounts in sterling",
         "GBP -2,320.00",
         "GBP -464.00",
         "1 GBP = 1.25 USD",
@@ -322,6 +318,144 @@ test("a foreign-currency UK VAT invoice retains sterling evidence and exact PDF 
     await expect(readWorkspaceState(userDataPath)).resolves.toEqual(issuedWorkspace);
     await expect(readFile(retainedPdfPath)).resolves.toEqual(retainedBytes);
     await expect(readFile(creditNotePdfPath)).resolves.toEqual(creditNotePdfBytes);
+  } finally {
+    await closeApp(electronApp);
+  }
+});
+
+test("a 30-row invoice and full credit note retain every multi-page PDF page", async ({
+  browserName: _browserName,
+}, testInfo) => {
+  test.setTimeout(120_000);
+  const userDataPath = await createUserDataPath("multi-page-invoice-credit");
+  const baseServiceLine = completeInvoiceDraftInput.serviceLines[0];
+  const serviceDescriptions = Array.from(
+    { length: 30 },
+    (_value, index) => `Ordered retained service ${String(index + 1).padStart(2, "0")}`,
+  );
+  const draft = persistedInvoiceDraftSchema.parse({
+    ...completeInvoiceDraftInput,
+    serviceLines: serviceDescriptions.map((serviceDescription) => ({
+      ...baseServiceLine,
+      billableDays: "1",
+      dayRate: "100",
+      serviceDescription,
+    })),
+  });
+  await writeFile(
+    join(userDataPath, "state.json"),
+    serializeWorkspaceState({
+      ...initialWorkspaceState,
+      clients: [completeClient],
+      draft: { draft, kind: "ordinary" },
+      issuer: completeIssuer,
+    }),
+  );
+  let electronApp = await launchProductionApp(userDataPath);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await page.getByRole("button", { name: "Resume draft" }).click();
+    await expect(page.getByLabel("Invoice preview").getByLabel(/^PDF page /u)).toHaveCount(3);
+    await reviewAndIssueInvoice(page);
+    await expect(page.getByRole("article", { name: "Invoice GGIOHK-0043" })).toBeVisible();
+
+    const issuedState = await readWorkspaceState(userDataPath);
+    const invoice = issuedState.issuedInvoices[0];
+    if (!invoice) throw new Error("Expected the 30-row invoice to be issued");
+    expect(invoice.serviceLines.map(({ serviceDescription }) => serviceDescription)).toEqual(
+      serviceDescriptions,
+    );
+    expect(invoice.totals).toEqual({ gross: "3000.00", net: "3000.00", vat: "0.00" });
+    await verifyRetainedInvoicePdf({
+      expectedPageCount: 3,
+      orderedText: serviceDescriptions,
+      pdfPath: join(userDataPath, "retained-pdfs", invoice.retainedPdf.filename),
+      requiredText: [
+        "INVOICE GGIOHK-0043",
+        "Ordered retained service 01",
+        "Ordered retained service 30",
+        "USD 3,000.00",
+        "Outside the scope of UK VAT.",
+      ],
+      rasterBaselinePaths: [1, 2, 3].map((page) =>
+        join(pdfBaselineDirectory, `multi-page-invoice-page-${page}-144dpi.png`),
+      ),
+      workingDirectory: testInfo.outputPath("multi-page-invoice"),
+    });
+
+    await issueFullCreditNote(page, invoice.id, "2026-09-06");
+    const creditedState = await readWorkspaceState(userDataPath);
+    const creditNote = creditedState.creditNotes[0];
+    if (!creditNote) throw new Error("Expected the 30-row credit note to be issued");
+    expect(creditNote.serviceLines.map(({ serviceDescription }) => serviceDescription)).toEqual(
+      serviceDescriptions,
+    );
+    expect(creditNote.totals).toEqual({ gross: "-3000.00", net: "-3000.00", vat: "0.00" });
+    await verifyRetainedInvoicePdf({
+      expectedPageCount: 3,
+      orderedText: serviceDescriptions,
+      pdfPath: join(userDataPath, "retained-pdfs", creditNote.retainedPdf.filename),
+      requiredText: [
+        "CREDIT NOTE CN-GGIOHK-0043",
+        "References invoice GGIOHK-0043, issued 2026-09-04",
+        "Ordered retained service 01",
+        "Ordered retained service 30",
+        "USD -3,000.00",
+        "The billed service period was incorrect.",
+      ],
+      rasterBaselinePaths: [1, 2, 3].map((page) =>
+        join(pdfBaselineDirectory, `multi-page-credit-note-page-${page}-144dpi.png`),
+      ),
+      workingDirectory: testInfo.outputPath("multi-page-credit-note"),
+    });
+    const retainedDocuments = await Promise.all(
+      [invoice, creditNote].map(async (document) => {
+        const bytes = await readFile(
+          join(userDataPath, "retained-pdfs", document.retainedPdf.filename),
+        );
+        expect(createHash("sha256").update(bytes).digest("hex")).toBe(document.retainedPdf.sha256);
+        return { document, bytes };
+      }),
+    );
+    await closeApp(electronApp);
+    electronApp = await launchProductionApp(userDataPath);
+    let currentPage = await electronApp.firstWindow();
+    await currentPage.getByRole("button", { name: "Invoices" }).click();
+    for (const { document, bytes } of retainedDocuments) {
+      const exportedPath = testInfo.outputPath(`${document.id}-export.pdf`);
+      await electronApp.evaluate(({ dialog }, path) => {
+        dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: path });
+      }, exportedPath);
+      await currentPage.getByRole("button", { name: `Export ${document.id}`, exact: true }).click();
+      await expect(readFile(exportedPath)).resolves.toEqual(bytes);
+    }
+    const backupPath = testInfo.outputPath("multi-page-dataset.zip");
+    await electronApp.evaluate(({ dialog }, path) => {
+      dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: path });
+    }, backupPath);
+    await currentPage.getByRole("button", { name: "Settings" }).click();
+    await currentPage.getByRole("button", { name: "Create backup" }).click();
+    await expect(currentPage.getByText("Complete backup created and validated.")).toBeVisible();
+    await closeApp(electronApp);
+    const restoredUserDataPath = await createUserDataPath("multi-page-restored");
+    electronApp = await launchProductionApp(restoredUserDataPath);
+    currentPage = await electronApp.firstWindow();
+    await currentPage.getByRole("button", { name: "Settings" }).click();
+    await electronApp.evaluate(({ dialog }, path) => {
+      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [path] });
+    }, backupPath);
+    await currentPage.getByRole("button", { name: "Restore backup" }).click();
+    await currentPage
+      .getByRole("dialog", { name: "Replace the complete dataset?" })
+      .getByRole("button", { name: "Replace complete dataset" })
+      .click();
+    await expect.poll(() => readWorkspaceState(restoredUserDataPath)).toEqual(creditedState);
+    for (const { document, bytes } of retainedDocuments) {
+      await expect(
+        readFile(join(restoredUserDataPath, "retained-pdfs", document.retainedPdf.filename)),
+      ).resolves.toEqual(bytes);
+    }
   } finally {
     await closeApp(electronApp);
   }
@@ -393,7 +527,7 @@ test("a multi-item invoice recovers, credits, replaces, and retains exact PDFs",
     );
     expect(retainedBytes.subarray(0, 5).toString()).toBe("%PDF-");
     await verifyRetainedInvoicePdf({
-      rasterBaselinePath: join(pdfBaselineDirectory, "outside-scope-invoice-144dpi.png"),
+      rasterBaselinePaths: [join(pdfBaselineDirectory, "outside-scope-invoice-page-1-144dpi.png")],
       pdfPath: retainedPdfPath,
       requiredText: [
         "INVOICE GGIOHK-0043",
@@ -418,7 +552,7 @@ test("a multi-item invoice recovers, credits, replaces, and retains exact PDFs",
       totals: { gross: "-3900.00", net: "-3900.00", vat: "0.00" },
     });
     await verifyRetainedInvoicePdf({
-      rasterBaselinePath: join(pdfBaselineDirectory, "full-credit-note-144dpi.png"),
+      rasterBaselinePaths: [join(pdfBaselineDirectory, "full-credit-note-page-1-144dpi.png")],
       pdfPath: join(userDataPath, "retained-pdfs", "CN-GGIOHK-0043.pdf"),
       requiredText: [
         "CREDIT NOTE CN-GGIOHK-0043",
@@ -795,7 +929,7 @@ test("post-commit document failures keep the issued invoice and each retry actio
   }
 });
 
-test("the production renderer blocks a valid amount that overflows the fixed document", async () => {
+test("the generated preview blocks a valid amount that overflows its PDF column", async () => {
   const userDataPath = await createUserDataPath("invoice-overflow");
   await writeFile(
     join(userDataPath, "state.json"),
@@ -817,9 +951,10 @@ test("the production renderer blocks a valid amount that overflows the fixed doc
     await page.getByRole("tab", { name: "Tax & issue" }).click();
     await page.getByLabel("Issue date").fill("2026-09-04");
     await expect(page.getByText("Saved on this Mac")).toBeVisible();
-    await page.getByRole("button", { name: "Review and issue" }).click();
-
-    await expect(page.getByText("The invoice does not fit the fixed A4 layout.")).toBeVisible();
+    await expect(page.getByLabel("Invoice preview").getByRole("alert")).toContainText(
+      "Could not prepare the invoice preview.",
+    );
+    await expect(page.getByRole("button", { name: "Review and issue" })).toBeDisabled();
     const unchangedState = await readWorkspaceState(userDataPath);
     expect(unchangedState.draft).not.toBeNull();
     expect(unchangedState.clients[0]?.invoiceSequence.nextNumber).toBe("43");
@@ -829,7 +964,7 @@ test("the production renderer blocks a valid amount that overflows the fixed doc
   }
 });
 
-test("the production renderer detects issuer text clipped inside the document header", async () => {
+test("the generated preview detects issuer text clipped inside the PDF header", async () => {
   const userDataPath = await createUserDataPath("invoice-header-overflow");
   const issuerWithUnbrokenAddress = persistedIssuerSettingsSchema.parse({
     ...completeIssuer,
@@ -854,9 +989,10 @@ test("the production renderer detects issuer text clipped inside the document he
     await page.getByRole("tab", { name: "Tax & issue" }).click();
     await page.getByLabel("Issue date").fill("2026-09-04");
     await expect(page.getByText("Saved on this Mac")).toBeVisible();
-    await page.getByRole("button", { name: "Review and issue" }).click();
-
-    await expect(page.getByText("The invoice does not fit the fixed A4 layout.")).toBeVisible();
+    await expect(page.getByLabel("Invoice preview").getByRole("alert")).toContainText(
+      "Could not prepare the invoice preview.",
+    );
+    await expect(page.getByRole("button", { name: "Review and issue" })).toBeDisabled();
     const unchangedState = await readWorkspaceState(userDataPath);
     expect(unchangedState.draft).not.toBeNull();
     expect(unchangedState.clients[0]?.invoiceSequence.nextNumber).toBe("43");
@@ -938,7 +1074,7 @@ for (const client of [completeClient, completeGbpVatClient]) {
   });
 }
 
-test("the production renderer blocks a full credit note whose reason exceeds its fixed region", async () => {
+test("the generated preview blocks a credit reason that exceeds its PDF region", async () => {
   const userDataPath = await createUserDataPath("credit-note-overflow");
   await writeFile(
     join(userDataPath, "state.json"),
@@ -959,13 +1095,12 @@ test("the production renderer blocks a full credit note whose reason exceeds its
     const issuedWorkspace = await readWorkspaceState(userDataPath);
     expect(issuedWorkspace.issuedInvoices).toHaveLength(1);
     await invoiceRecord.getByRole("button", { name: "Correct GGIOHK-0043" }).click();
-    await page
-      .getByLabel("Correction reason")
-      .fill("The invoiced service dates are incorrect. ".repeat(20));
+    await page.getByLabel("Correction reason").fill("W".repeat(800));
     await page.getByLabel("Credit-note issue date").fill("2026-09-04");
-    await page.getByRole("button", { name: "Review and issue credit note" }).click();
-
-    await expect(page.getByText("The credit note does not fit the fixed A4 layout.")).toBeVisible();
+    await expect(page.getByLabel("Credit note preview").getByRole("alert")).toContainText(
+      "Could not prepare the credit-note preview.",
+    );
+    await expect(page.getByRole("button", { name: "Review and issue credit note" })).toBeDisabled();
     const unchangedWorkspace = await readWorkspaceState(userDataPath);
     expect(unchangedWorkspace.issuedInvoices).toEqual(issuedWorkspace.issuedInvoices);
     expect(unchangedWorkspace.creditNotes).toHaveLength(0);
@@ -1020,11 +1155,10 @@ async function issueFullCreditNote(
 }
 
 async function expectPreviewFits(preview: Locator): Promise<void> {
-  const rawMeasurements: unknown = await preview.evaluate(collectBillingDocumentMeasurements);
-  const measurements = billingDocumentMeasurementsSchema.parse(rawMeasurements);
-  const fit = evaluateBillingDocumentFit(measurements);
-  const failedRegions = fit.regions.filter((region) => fit.failures.includes(region.name));
-  expect(fit.failures, JSON.stringify({ page: fit.page, failedRegions })).toEqual([]);
+  const firstPage = preview.locator(".billing-pdf-preview__page").first();
+  await expect(firstPage).toBeVisible();
+  await expect(firstPage.locator("canvas")).toBeVisible();
+  await expect(firstPage.locator(".textLayer span").first()).toBeAttached();
 }
 
 async function readWorkspaceState(userDataPath: string): Promise<WorkspaceState> {

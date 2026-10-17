@@ -12,6 +12,7 @@ import type {
   InvoiceIssueResult,
   InvoiceIssueReviewResult,
   IssuerSettingsSaveResult,
+  PdfPreviewResult,
   ReplacementDraftCreateResult,
   RestoreInspectionResult,
   RestoreResult,
@@ -40,6 +41,8 @@ import {
   inspectRestoreBackupChannel,
   restoreBackupChannel,
   quitApplicationChannel,
+  previewFullCreditNoteChannel,
+  previewInvoiceDraftChannel,
   replaceDraftWithReplacementChannel,
   reviewInvoiceIssueChannel,
   reviewFullCreditNoteChannel,
@@ -79,6 +82,8 @@ export function registerInvoiceAppIpc({
   ipcMain.removeHandler(issueFullCreditNoteChannel);
   ipcMain.removeHandler(reviewInvoiceIssueChannel);
   ipcMain.removeHandler(reviewFullCreditNoteChannel);
+  ipcMain.removeHandler(previewInvoiceDraftChannel);
+  ipcMain.removeHandler(previewFullCreditNoteChannel);
   ipcMain.removeHandler(discardInvoiceDraftChannel);
   ipcMain.removeHandler(saveInvoiceDraftChannel);
   ipcMain.removeHandler(saveIssuerSettingsChannel);
@@ -255,6 +260,33 @@ export function registerInvoiceAppIpc({
     }
   }
 
+  function previewInvoiceDraft(
+    event: IpcMainInvokeEvent,
+    ...inputs: unknown[]
+  ): Promise<PdfPreviewResult> {
+    rejectUntrustedSender(event);
+    if (inputs.length !== 1) throw new Error("previewInvoiceDraft requires one draft input");
+    try {
+      return invoiceApplication.previewInvoiceDraft(parseInvoiceDraftInput(inputs[0]));
+    } catch {
+      return Promise.resolve({ kind: "invalid", message: "Invoice draft is invalid." });
+    }
+  }
+
+  function previewFullCreditNote(
+    event: IpcMainInvokeEvent,
+    ...inputs: unknown[]
+  ): Promise<PdfPreviewResult> {
+    rejectUntrustedSender(event);
+    if (inputs.length !== 1)
+      throw new Error("previewFullCreditNote requires one credit-note input");
+    try {
+      return invoiceApplication.previewFullCreditNote(parseFullCreditNoteInput(inputs[0]));
+    } catch {
+      return Promise.resolve({ kind: "invalid", message: "The credit note is invalid." });
+    }
+  }
+
   function issueFullCreditNote(
     event: IpcMainInvokeEvent,
     ...inputs: unknown[]
@@ -302,6 +334,8 @@ export function registerInvoiceAppIpc({
   ipcMain.handle(issueFullCreditNoteChannel, issueFullCreditNote);
   ipcMain.handle(reviewInvoiceIssueChannel, reviewInvoiceIssue);
   ipcMain.handle(reviewFullCreditNoteChannel, reviewFullCreditNote);
+  ipcMain.handle(previewInvoiceDraftChannel, previewInvoiceDraft);
+  ipcMain.handle(previewFullCreditNoteChannel, previewFullCreditNote);
   ipcMain.handle(discardInvoiceDraftChannel, discardInvoiceDraft);
   ipcMain.handle(saveInvoiceDraftChannel, saveInvoiceDraft);
   ipcMain.handle(saveIssuerSettingsChannel, saveIssuerSettings);

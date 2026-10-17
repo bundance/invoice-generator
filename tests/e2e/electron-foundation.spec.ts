@@ -112,6 +112,8 @@ test("production window exposes only the guarded sandboxed workspace bridge", as
       "issueFullCreditNote",
       "openRetainedDocument",
       "printRetainedDocument",
+      "previewInvoiceDraft",
+      "previewFullCreditNote",
       "quitApplication",
       "reviewInvoiceIssue",
       "reviewFullCreditNote",
@@ -164,6 +166,26 @@ test("production window exposes only the guarded sandboxed workspace bridge", as
       kind: "invalid",
       message: "Invoice draft is invalid.",
     });
+    expect(await page.evaluate("window.invoiceApp.previewInvoiceDraft({})")).toEqual({
+      kind: "invalid",
+      message: "Invoice draft is invalid.",
+    });
+    expect(await page.evaluate("window.invoiceApp.previewFullCreditNote({})")).toEqual({
+      kind: "invalid",
+      message: "The credit note is invalid.",
+    });
+    await expect(page.evaluate("window.invoiceApp.previewInvoiceDraft()")).rejects.toThrow(
+      /requires one draft input/u,
+    );
+    await expect(page.evaluate("window.invoiceApp.previewInvoiceDraft({}, {})")).rejects.toThrow(
+      /requires one draft input/u,
+    );
+    await expect(page.evaluate("window.invoiceApp.previewFullCreditNote()")).rejects.toThrow(
+      /requires one credit-note input/u,
+    );
+    await expect(page.evaluate("window.invoiceApp.previewFullCreditNote({}, {})")).rejects.toThrow(
+      /requires one credit-note input/u,
+    );
     expect(await page.evaluate("window.invoiceApp.reviewInvoiceIssue({})")).toEqual({
       kind: "invalid",
       message: "The invoice draft is not ready to issue.",
@@ -253,6 +275,18 @@ test("production window exposes only the guarded sandboxed workspace bridge", as
             () => "allowed",
             () => "rejected",
           );
+        const previewDraftResult = await untrustedWindow.webContents
+          .executeJavaScript("window.invoiceApp.previewInvoiceDraft({})")
+          .then(
+            () => "allowed",
+            () => "rejected",
+          );
+        const previewCreditResult = await untrustedWindow.webContents
+          .executeJavaScript("window.invoiceApp.previewFullCreditNote({})")
+          .then(
+            () => "allowed",
+            () => "rejected",
+          );
         const discardDraftResult = await untrustedWindow.webContents
           .executeJavaScript("window.invoiceApp.discardInvoiceDraft()")
           .then(
@@ -305,6 +339,8 @@ test("production window exposes only the guarded sandboxed workspace bridge", as
           restoreBackupResult,
           replaceDraftResult,
           saveDraftResult,
+          previewDraftResult,
+          previewCreditResult,
           saveResult,
           updateClientResult,
         };
@@ -321,6 +357,8 @@ test("production window exposes only the guarded sandboxed workspace bridge", as
           restoreBackupResult: "rejected",
           replaceDraftResult: "rejected",
           saveDraftResult: "rejected",
+          previewDraftResult: "rejected",
+          previewCreditResult: "rejected",
           saveResult: "rejected",
           updateClientResult: "rejected",
         };
@@ -340,6 +378,8 @@ test("production window exposes only the guarded sandboxed workspace bridge", as
       restoreBackupResult: "rejected",
       replaceDraftResult: "rejected",
       saveDraftResult: "rejected",
+      previewDraftResult: "rejected",
+      previewCreditResult: "rejected",
       saveResult: "rejected",
       updateClientResult: "rejected",
     });

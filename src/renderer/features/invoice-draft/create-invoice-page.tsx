@@ -108,7 +108,7 @@ function SetupWorkspace({ onDestinationChange, requirements }: SetupWorkspacePro
     <div className="document-studio">
       <section className="preview-panel" aria-label="Invoice preview">
         <div className="preview-toolbar">
-          <span>Live A4 preview</span>
+          <span>Generated PDF preview</span>
           <small>Waiting for setup</small>
         </div>
         <div className="invoice-paper">

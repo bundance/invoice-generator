@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
 import { listDescendantFilePaths } from "./file-tree.ts";
+import { requiresArchitectureInspection } from "./application-binary-files.ts";
 import { checkPackageContract, type PackagedReleaseCandidate } from "./package-contract.ts";
+import { isAlternatePlatformArtifact } from "./platform-artifacts.ts";
 
 const releaseDirectory = join(process.cwd(), "release");
 const releaseFiles = await listDescendantFilePaths(releaseDirectory);
@@ -33,11 +35,7 @@ const asarPaths = dmgInspection.asarInspection.paths;
 const publishOrUpdateMetadata = [...releaseFiles, ...asarPaths].filter((path) =>
   /(?:app-update|latest[^/]*\.ya?ml|\.blockmap$|publish)/iu.test(path),
 );
-const alternatePlatformArtifacts = releaseFiles.filter((path) =>
-  /(?:\.AppImage|\.deb|\.exe|\.msi|\.pkg|\.rpm|\.snap|\.zip|mac-(?:universal|x64)|win-|linux-)/iu.test(
-    path,
-  ),
-);
+const alternatePlatformArtifacts = releaseFiles.filter(isAlternatePlatformArtifact);
 const forbiddenRuntimeMetadata = [
   ...asarPaths.filter((path) => /(?:electron-updater|autoUpdater|update\.ya?ml)/iu.test(path)),
   ...dmgInspection.asarInspection.forbiddenContent,
@@ -121,16 +119,16 @@ function runRequired(command: string, arguments_: readonly string[]): CommandRes
 
 async function inspectApplicationBinaries(applicationPath: string): Promise<ApplicationBinary[]> {
   const applicationPaths = await listDescendantFilePaths(applicationPath);
-  const executablePaths = (
+  const binaryPaths = (
     await Promise.all(
       applicationPaths.map(async (path) => {
         const file = await lstat(path);
-        return file.isFile() && (file.mode & 0o111) !== 0 ? path : null;
+        return file.isFile() && requiresArchitectureInspection(path, file.mode) ? path : null;
       }),
     )
   ).filter((path): path is string => path !== null);
 
-  return executablePaths.map((path) => ({
+  return binaryPaths.map((path) => ({
     architectures: runRequired("lipo", ["-archs", path])
       .stdout.trim()
       .split(/\s+/u)

@@ -56,7 +56,7 @@ export type BillingDocumentModel =
 
 export function createIssuedInvoiceDocumentModel(
   invoice: IssuedInvoice | IssuedInvoiceSnapshot,
-): BillingDocumentModel {
+): Extract<BillingDocumentModel, { kind: "issued-invoice" }> {
   return {
     ...createFinalBillingDocumentModel({ ...invoice, issueDate: invoice.issue.date }),
     kind: "issued-invoice",
@@ -65,7 +65,7 @@ export function createIssuedInvoiceDocumentModel(
 
 export function createCreditNoteDocumentModel(
   creditNote: CreditNote | CreditNoteSnapshot | FullCreditNoteCandidate,
-): BillingDocumentModel {
+): Extract<BillingDocumentModel, { kind: "credit-note" }> {
   const issueDate = "issueDate" in creditNote ? creditNote.issueDate : creditNote.issue.date;
   return {
     ...createFinalBillingDocumentModel({ ...creditNote, issueDate }),
@@ -78,7 +78,7 @@ export function createCreditNoteDocumentModel(
 
 export function createCandidateInvoiceDocumentModel(
   candidate: InvoiceCandidate,
-): BillingDocumentModel {
+): Extract<BillingDocumentModel, { kind: "issued-invoice" }> {
   return { ...createFinalBillingDocumentModel(candidate), kind: "issued-invoice" };
 }
 
@@ -168,7 +168,7 @@ function resolveFinalDocumentId(document: FinalBillingDocumentFacts): string {
 export function createDraftInvoiceDocumentModel(
   issuer: IssuerSettings,
   review: InvoiceDraftReview,
-): BillingDocumentModel {
+): Extract<BillingDocumentModel, { kind: "draft-invoice" }> {
   const preview = review.preview;
   return {
     kind: "draft-invoice",
