@@ -61,18 +61,18 @@ test("a GBP UK VAT invoice keeps exact tax facts and retained evidence after res
     await expect(page.getByText("Saved on this Mac")).toBeVisible();
 
     const preview = page.getByLabel("Invoice preview");
-    await expect(preview).toContainText("GBP 2,900.00");
-    await expect(preview).toContainText("GBP 580.00");
-    await expect(preview).toContainText("GBP 3,480.00");
+    await expect(preview).toContainText("£2,900.00");
+    await expect(preview).toContainText("£580.00");
+    await expect(preview).toContainText("£3,480.00");
     await expect(preview).toContainText("20%");
     await expect(preview).toContainText("Tax point: 2026-09-05");
     await expectPreviewFits(preview);
 
     await page.getByRole("button", { name: "Review and issue" }).click();
     let dialog = page.getByRole("dialog", { name: "Issue invoice ACME-0008?" });
-    await expect(dialog).toContainText("GBP 2,900.00");
-    await expect(dialog).toContainText("GBP 580.00");
-    await expect(dialog).toContainText("GBP 3,480.00");
+    await expect(dialog).toContainText("£2,900.00");
+    await expect(dialog).toContainText("£580.00");
+    await expect(dialog).toContainText("£3,480.00");
     await expect(dialog).toContainText("Codernetic Ltd");
     await expect(dialog).toContainText("UK VAT applies.");
     await expect(dialog).toContainText("20%");
@@ -88,9 +88,9 @@ test("a GBP UK VAT invoice keeps exact tax facts and retained evidence after res
     await dialog.getByRole("button", { name: "Issue ACME-0008" }).click();
 
     const invoiceRecord = page.getByRole("article", { name: "Invoice ACME-0008" });
-    await expect(invoiceRecord).toContainText("GBP 2,900.00");
-    await expect(invoiceRecord).toContainText("GBP 580.00");
-    await expect(invoiceRecord).toContainText("GBP 3,480.00");
+    await expect(invoiceRecord).toContainText("£2,900.00");
+    await expect(invoiceRecord).toContainText("£580.00");
+    await expect(invoiceRecord).toContainText("£3,480.00");
     await expect(invoiceRecord).toContainText("Codernetic Ltd");
     await expect(invoiceRecord).toContainText("UK VAT at 20%");
     await expect(invoiceRecord).toContainText("UK VAT applies.");
@@ -125,9 +125,9 @@ test("a GBP UK VAT invoice keeps exact tax facts and retained evidence after res
         "INVOICE ACME-0008",
         "Codernetic Ltd",
         "Acme Research Ltd",
-        "GBP 2,900.00",
-        "GBP 580.00",
-        "GBP 3,480.00",
+        "£2,900.00",
+        "£580.00",
+        "£3,480.00",
         "Tax point: 2026-09-05",
         "20%",
         "UK VAT applies.",
@@ -142,9 +142,9 @@ test("a GBP UK VAT invoice keeps exact tax facts and retained evidence after res
         "CREDIT NOTE CN-ACME-0008",
         "References invoice ACME-0008, issued 2026-09-06",
         "The billed service period was incorrect.",
-        "GBP -2,900.00",
-        "GBP -580.00",
-        "GBP -3,480.00",
+        "-£2,900.00",
+        "-£580.00",
+        "-£3,480.00",
         "UK VAT applies.",
       ],
       workingDirectory: join(userDataPath, "credit-note-pdf-verification"),
@@ -158,7 +158,7 @@ test("a GBP UK VAT invoice keeps exact tax facts and retained evidence after res
       "Fully credited",
     );
     await expect(page.getByRole("article", { name: "Credit note CN-ACME-0008" })).toContainText(
-      "GBP -3,480.00",
+      "-£3,480.00",
     );
     await page.getByRole("button", { name: "Create invoice" }).click();
     await expect(page.getByText(/Only the final issue action can consume ACME-0009/)).toBeVisible();
@@ -200,21 +200,21 @@ test("a foreign-currency UK VAT invoice retains sterling evidence and exact PDF 
     await expect(page.getByText("Saved on this Mac")).toBeVisible();
 
     const preview = page.getByLabel("Invoice preview");
-    await expect(preview).toContainText("USD 3,480.00");
-    await expect(preview).toContainText("GBP 2,784.00");
+    await expect(preview).toContainText("$3,480.00");
+    await expect(preview).toContainText("£2,784.00");
     await expect(preview).toContainText("1 GBP = 1.25 USD");
     await expectPreviewFits(preview);
 
     await page.getByRole("button", { name: "Review and issue" }).click();
     const dialog = page.getByRole("dialog", { name: "Issue invoice USDVAT-0012?" });
-    await expect(dialog).toContainText("USD 3,480.00");
-    await expect(dialog).toContainText("GBP 2,784.00");
+    await expect(dialog).toContainText("$3,480.00");
+    await expect(dialog).toContainText("£2,784.00");
     await expect(dialog).toContainText("HMRC monthly exchange rates, September 2026");
     await dialog.getByRole("button", { name: "Issue USDVAT-0012" }).click();
 
     const invoiceRecord = page.getByRole("article", { name: "Invoice USDVAT-0012" });
-    await expect(invoiceRecord).toContainText("USD 3,480.00");
-    await expect(invoiceRecord).toContainText("GBP 2,784.00");
+    await expect(invoiceRecord).toContainText("$3,480.00");
+    await expect(invoiceRecord).toContainText("£2,784.00");
     await expect(invoiceRecord).toContainText("1 GBP = 1.25 USD");
     await expect(invoiceRecord).toContainText("HMRC period rate");
     await issueFullCreditNote(page, "USDVAT-0012", "2026-09-06");
@@ -254,11 +254,11 @@ test("a foreign-currency UK VAT invoice retains sterling evidence and exact PDF 
       requiredText: [
         "INVOICE USDVAT-0012",
         "Acme Research US",
-        "USD 2,900.00",
-        "USD 580.00",
+        "$2,900.00",
+        "$580.00",
         "VAT amounts in sterling",
-        "GBP 2,320.00",
-        "GBP 464.00",
+        "£2,320.00",
+        "£464.00",
         "1 GBP = 1.25 USD",
         "Effective date: 2026-09-05",
         "HMRC period rate",
@@ -280,10 +280,10 @@ test("a foreign-currency UK VAT invoice retains sterling evidence and exact PDF 
       pdfPath: creditNotePdfPath,
       requiredText: [
         "CREDIT NOTE CN-USDVAT-0012",
-        "USD -3,480.00",
+        "-$3,480.00",
         "VAT amounts in sterling",
-        "GBP -2,320.00",
-        "GBP -464.00",
+        "-£2,320.00",
+        "-£464.00",
         "1 GBP = 1.25 USD",
         "HMRC monthly exchange rates, September 2026",
       ],
@@ -307,7 +307,7 @@ test("a foreign-currency UK VAT invoice retains sterling evidence and exact PDF 
     const restartedCreditNoteRecord = page.getByRole("article", {
       name: "Credit note CN-USDVAT-0012",
     });
-    await expect(restartedCreditNoteRecord).toContainText("GBP -2,784.00");
+    await expect(restartedCreditNoteRecord).toContainText("-£2,784.00");
     const restartedCreditExportPath = testInfo.outputPath("credit-note-after-restart.pdf");
     await electronApp.evaluate(({ dialog }, filePath) => {
       dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath });
@@ -375,7 +375,7 @@ test("a 30-row invoice and full credit note retain every multi-page PDF page", a
         "INVOICE GGIOHK-0043",
         "Ordered retained service 01",
         "Ordered retained service 30",
-        "USD 3,000.00",
+        "$3,000.00",
         "Outside the scope of UK VAT.",
       ],
       rasterBaselinePaths: [1, 2, 3].map((page) =>
@@ -401,7 +401,7 @@ test("a 30-row invoice and full credit note retain every multi-page PDF page", a
         "References invoice GGIOHK-0043, issued 2026-09-04",
         "Ordered retained service 01",
         "Ordered retained service 30",
-        "USD -3,000.00",
+        "-$3,000.00",
         "The billed service period was incorrect.",
       ],
       rasterBaselinePaths: [1, 2, 3].map((page) =>
@@ -503,7 +503,7 @@ test("a multi-item invoice recovers, credits, replaces, and retains exact PDFs",
 
     const invoiceRecord = page.getByRole("article", { name: "Invoice GGIOHK-0043" });
     await expect(invoiceRecord).toBeVisible();
-    await expect(invoiceRecord).toContainText("USD 3,900.00");
+    await expect(invoiceRecord).toContainText("$3,900.00");
     const issuedState = await readWorkspaceState(userDataPath);
     expect(issuedState.draft).toBeNull();
     expect(issuedState.clients[0]?.invoiceSequence.nextNumber).toBe("44");
@@ -533,7 +533,7 @@ test("a multi-item invoice recovers, credits, replaces, and retains exact PDFs",
         "INVOICE GGIOHK-0043",
         "Genesis Global",
         "Architecture workshop",
-        "USD 3,900.00",
+        "$3,900.00",
         "Outside the scope of UK VAT.",
         "Company Reg. No. 8822243",
       ],
@@ -558,7 +558,7 @@ test("a multi-item invoice recovers, credits, replaces, and retains exact PDFs",
         "CREDIT NOTE CN-GGIOHK-0043",
         "References invoice GGIOHK-0043, issued 2026-09-04",
         "Architecture workshop",
-        "USD -3,900.00",
+        "-$3,900.00",
         "Outside the scope of UK VAT.",
         "The billed service period was incorrect.",
       ],
@@ -671,7 +671,7 @@ test("a multi-item invoice recovers, credits, replaces, and retains exact PDFs",
         "INVOICE GGIOHK-0044",
         "Genesis Global",
         "Architecture workshop",
-        "USD 3,900.00",
+        "$3,900.00",
         "Outside the scope of UK VAT.",
       ],
       workingDirectory: join(userDataPath, "replacement-pdf-verification"),
@@ -715,18 +715,13 @@ test("a multi-item invoice recovers, credits, replaces, and retains exact PDFs",
         "CREDIT NOTE CN-GGIOHK-0044",
         "References invoice GGIOHK-0044, issued 2026-09-08",
         "Architecture workshop",
-        "USD -3,900.00",
+        "-$3,900.00",
       ],
       workingDirectory: join(userDataPath, "second-credit-note-pdf-verification"),
     });
     await verifyRetainedInvoicePdf({
       pdfPath: join(userDataPath, "retained-pdfs", "GGIOHK-0045.pdf"),
-      requiredText: [
-        "INVOICE GGIOHK-0045",
-        "Genesis Global",
-        "Architecture workshop",
-        "USD 3,900.00",
-      ],
+      requiredText: ["INVOICE GGIOHK-0045", "Genesis Global", "Architecture workshop", "$3,900.00"],
       workingDirectory: join(userDataPath, "second-replacement-pdf-verification"),
     });
 

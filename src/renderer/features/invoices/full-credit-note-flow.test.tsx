@@ -125,7 +125,7 @@ describe("full credit note flow", () => {
     await user.click(screen.getByRole("button", { name: "Review and issue credit note" }));
     let dialog = screen.getByRole("dialog", { name: "Issue credit note CN-GGIOHK-0043?" });
     expect(dialog).toHaveTextContent("GGIOHK-0043");
-    expect(dialog).toHaveTextContent("USD -2,900.00");
+    expect(dialog).toHaveTextContent("-$2,900.00");
     expect(dialog).toHaveTextContent("The billed service period was incorrect.");
     expect(dialog).toHaveTextContent("cannot be edited or deleted");
     await user.click(within(dialog).getByRole("button", { name: "Keep reviewing" }));
@@ -154,7 +154,7 @@ describe("full credit note flow", () => {
     );
     expect(screen.queryByRole("button", { name: "Correct GGIOHK-0043" })).not.toBeInTheDocument();
     expect(screen.getByRole("article", { name: "Credit note CN-GGIOHK-0043" })).toHaveTextContent(
-      "USD -2,900.00",
+      "-$2,900.00",
     );
   });
 

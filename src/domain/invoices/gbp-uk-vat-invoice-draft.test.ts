@@ -51,9 +51,9 @@ describe("GBP UK VAT invoice draft", () => {
       },
       errors: [],
       formattedTotals: {
-        gross: "GBP 3,480.00",
-        net: "GBP 2,900.00",
-        vat: "GBP 580.00",
+        gross: "£3,480.00",
+        net: "£2,900.00",
+        vat: "£580.00",
       },
       preview: {
         serviceLines: [{ vatRate: "20" }],

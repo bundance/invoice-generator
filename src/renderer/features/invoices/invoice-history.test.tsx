@@ -73,7 +73,7 @@ describe("invoice history", () => {
     expect(record).not.toHaveTextContent("Current client record");
     expect(record).not.toHaveTextContent("Current issuer settings");
     expect(record).toHaveTextContent("2026-09-04");
-    expect(record).toHaveTextContent("USD 2,900.00");
+    expect(record).toHaveTextContent("$2,900.00");
     expect(record).toHaveTextContent("Outside the scope of UK VAT");
 
     await user.click(within(record).getByRole("button", { name: "Open GGIOHK-0043" }));

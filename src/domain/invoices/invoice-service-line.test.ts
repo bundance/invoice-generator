@@ -150,9 +150,9 @@ describe("invoice service lines", () => {
     expect(review.totals).toEqual({ gross: "3625.00", net: "3625.00", vat: "0.00" });
     expect(review.previews[0]).toMatchObject({
       formattedTotals: {
-        gross: "GBP 3,625.00",
-        net: "GBP 3,625.00",
-        vat: "GBP 0.00",
+        gross: "£3,625.00",
+        net: "£3,625.00",
+        vat: "£0.00",
       },
       totals: { gross: "3625.00", net: "3625.00", vat: "0.00" },
     });

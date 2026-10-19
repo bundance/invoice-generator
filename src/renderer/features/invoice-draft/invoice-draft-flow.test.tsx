@@ -87,7 +87,7 @@ describe("outside-scope invoice draft", () => {
     await replaceField(user, "Billable days", "5");
     expect(screen.getByText("Saving")).toBeVisible();
     expect(screen.getByRole("button", { name: /React Native consultancy/ })).toHaveTextContent(
-      "USD 3,625.00",
+      "$3,625.00",
     );
 
     await waitFor(() => expect(savedDrafts).not.toHaveLength(0));
@@ -360,8 +360,8 @@ describe("outside-scope invoice draft", () => {
     expect(within(dialog).getByText("Net")).toBeVisible();
     expect(within(dialog).getByText("VAT")).toBeVisible();
     expect(within(dialog).getByText("Gross")).toBeVisible();
-    expect(within(dialog).getAllByText("USD 2,900.00")).toHaveLength(2);
-    expect(within(dialog).getByText("USD 0.00")).toBeVisible();
+    expect(within(dialog).getAllByText("$2,900.00")).toHaveLength(2);
+    expect(within(dialog).getByText("$0.00")).toBeVisible();
     expect(within(dialog).getByText("Outside the scope of UK VAT")).toBeVisible();
     expect(within(dialog).getByText(/cannot be edited or deleted/)).toBeVisible();
     expect(within(dialog).getByRole("button", { name: "Keep editing" })).toHaveFocus();
