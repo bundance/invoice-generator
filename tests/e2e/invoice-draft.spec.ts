@@ -63,9 +63,7 @@ test("an outside-scope draft autosaves, resumes after restart, and discards with
     await page.getByLabel("Billable days").fill("5");
     await page.getByLabel("Notes").fill("Resume this exact draft");
 
-    await expect(
-      page.getByLabel("Invoice preview").getByText("USD 3,625.00").first(),
-    ).toBeVisible();
+    await expect(page.getByLabel("Invoice preview").getByText("$3,625.00").first()).toBeVisible();
     await expect(page.getByText("Saved on this Mac")).toBeVisible();
     await expect
       .poll(async () => (await readWorkspaceState(userDataPath)).draft?.draft.notes)

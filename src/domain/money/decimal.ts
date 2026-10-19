@@ -76,9 +76,19 @@ export function formatCurrencyAmount(
   currencyCode: string,
   fractionalDigits: number,
 ): string {
-  const [whole = "0", fraction = ""] = amount.split(".");
+  const negative = amount.startsWith("-");
+  const [whole = "0", fraction = ""] = (negative ? amount.slice(1) : amount).split(".");
   const groupedWhole = whole.replace(/\B(?=(\d{3})+(?!\d))/gu, ",");
-  return `${currencyCode} ${groupedWhole}${fractionalDigits > 0 ? `.${fraction.padEnd(fractionalDigits, "0")}` : ""}`;
+  const symbol =
+    new Intl.NumberFormat("en-GB", {
+      currency: currencyCode,
+      currencyDisplay: "narrowSymbol",
+      style: "currency",
+    })
+      .formatToParts(0)
+      .find((part) => part.type === "currency")?.value ?? currencyCode;
+  const prefix = symbol === currencyCode ? `${currencyCode} ` : symbol;
+  return `${negative ? "-" : ""}${prefix}${groupedWhole}${fractionalDigits > 0 ? `.${fraction.padEnd(fractionalDigits, "0")}` : ""}`;
 }
 
 type DecimalParts = Readonly<{ digits: bigint; scale: number }>;

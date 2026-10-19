@@ -169,8 +169,8 @@ describe("foreign-currency UK VAT invoice flow", () => {
 
     await user.click(screen.getByRole("button", { name: "Review and issue" }));
     const dialog = await screen.findByRole("dialog", { name: "Issue invoice USDVAT-0012?" });
-    expect(dialog).toHaveTextContent("USD 3,480.00");
-    expect(dialog).toHaveTextContent("GBP 2,784.00");
+    expect(dialog).toHaveTextContent("$3,480.00");
+    expect(dialog).toHaveTextContent("£2,784.00");
     expect(dialog).toHaveTextContent("1 GBP = 1.25 USD");
     const dialogEvidence = within(dialog).getByText(
       (_, element) => element?.textContent === evidenceReference,
@@ -179,8 +179,8 @@ describe("foreign-currency UK VAT invoice flow", () => {
     await user.click(within(dialog).getByRole("button", { name: "Issue USDVAT-0012" }));
 
     const history = await screen.findByRole("article", { name: "Invoice USDVAT-0012" });
-    expect(history).toHaveTextContent("USD 3,480.00");
-    expect(history).toHaveTextContent("GBP 2,784.00");
+    expect(history).toHaveTextContent("$3,480.00");
+    expect(history).toHaveTextContent("£2,784.00");
     expect(history).toHaveTextContent("1 GBP = 1.25 USD");
     expect(history).toHaveTextContent("2026-09-05");
     const historyEvidence = within(history).getByText(

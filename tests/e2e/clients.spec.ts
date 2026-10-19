@@ -204,7 +204,7 @@ test("a used client stays locked while copied clients and future defaults remain
     await expect(invoiceRecord).toContainText("Codernetic Ltd");
     await expect(invoiceRecord).not.toContainText("Genesis Global UK");
     await expect(invoiceRecord).not.toContainText("Codernetic Future Ltd");
-    await expect(invoiceRecord).toContainText("USD 2,900.00");
+    await expect(invoiceRecord).toContainText("$2,900.00");
     await expect(
       readFile(join(userDataPath, "retained-pdfs", retainedPdf.filename)),
     ).resolves.toEqual(retainedBytes);

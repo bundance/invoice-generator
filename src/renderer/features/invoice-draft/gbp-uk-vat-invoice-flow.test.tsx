@@ -94,16 +94,16 @@ describe("GBP UK VAT invoice flow", () => {
     expect(within(dialog).getByText("Codernetic Ltd")).toBeVisible();
     expect(within(dialog).getByText("20%")).toBeVisible();
     expect(within(dialog).getByText("2026-09-05")).toBeVisible();
-    expect(within(dialog).getByText("GBP 2,900.00")).toBeVisible();
-    expect(within(dialog).getByText("GBP 580.00")).toBeVisible();
-    expect(within(dialog).getByText("GBP 3,480.00")).toBeVisible();
+    expect(within(dialog).getByText("£2,900.00")).toBeVisible();
+    expect(within(dialog).getByText("£580.00")).toBeVisible();
+    expect(within(dialog).getByText("£3,480.00")).toBeVisible();
     expect(within(dialog).getByText("UK VAT applies.")).toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "Issue ACME-0008" }));
 
     const history = await screen.findByRole("article", { name: "Invoice ACME-0008" });
-    expect(history).toHaveTextContent("GBP 2,900.00");
-    expect(history).toHaveTextContent("GBP 580.00");
-    expect(history).toHaveTextContent("GBP 3,480.00");
+    expect(history).toHaveTextContent("£2,900.00");
+    expect(history).toHaveTextContent("£580.00");
+    expect(history).toHaveTextContent("£3,480.00");
     expect(history).toHaveTextContent("Codernetic Ltd");
     expect(history).toHaveTextContent("UK VAT at 20%");
     expect(history).toHaveTextContent("UK VAT applies.");

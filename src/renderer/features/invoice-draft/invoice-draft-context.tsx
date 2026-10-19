@@ -1,5 +1,6 @@
 import type { Client } from "../../../domain/clients/client.ts";
 import { formatDocumentId } from "../../../domain/clients/client.ts";
+import { formatCurrencyAmount } from "../../../domain/money/decimal.ts";
 
 export function InvoiceDraftContext({ client }: Readonly<{ client: Client | undefined }>) {
   if (!client) {
@@ -19,7 +20,12 @@ export function InvoiceDraftContext({ client }: Readonly<{ client: Client | unde
           {formatDocumentId(client.invoiceSequence.prefix, client.invoiceSequence.nextNumber)}
         </li>
         <li>
-          {client.currency.code} {client.standardDayRate} per day
+          {formatCurrencyAmount(
+            client.standardDayRate,
+            client.currency.code,
+            client.currency.minorUnit,
+          )}{" "}
+          per day
         </li>
       </ul>
     </div>

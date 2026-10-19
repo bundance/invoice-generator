@@ -145,7 +145,7 @@ describe("client management", () => {
     expect(await screen.findByRole("combobox", { name: "Client" })).toHaveValue(completeClient.id);
     expect(screen.getByText("Draft defaults ready for Genesis Global.")).toBeVisible();
     expect(screen.getByText("GGIOHK-0043")).toBeVisible();
-    expect(screen.getByText("USD 725 per day")).toBeVisible();
+    expect(screen.getByText("$725.00 per day")).toBeVisible();
   });
 
   it("edits one client without changing another client's defaults or counters", async () => {

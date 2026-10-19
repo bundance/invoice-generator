@@ -93,9 +93,9 @@ describe("outside-scope invoice draft", () => {
       },
       errors: [],
       formattedTotals: {
-        gross: "USD 0.01",
-        net: "USD 0.01",
-        vat: "USD 0.00",
+        gross: "$0.01",
+        net: "$0.01",
+        vat: "$0.00",
       },
       warnings: [],
     });
@@ -106,7 +106,7 @@ describe("outside-scope invoice draft", () => {
     {
       currency: { code: "JPY", minorUnit: 0, name: "Yen" },
       dayRate: "2",
-      expectedAmount: "JPY 1",
+      expectedAmount: "¥1",
     },
     {
       currency: { code: "BHD", minorUnit: 3, name: "Bahraini Dinar" },
@@ -218,7 +218,7 @@ describe("outside-scope invoice draft", () => {
       clientLegalName: "Genesis Global",
       notes: "First line\nSecond line",
       purchaseOrder: "PO 42",
-      serviceLines: [{ billableDays: "1", formattedDayRate: "USD 725.00" }],
+      serviceLines: [{ billableDays: "1", formattedDayRate: "$725.00" }],
     });
     expect(review.warnings).toEqual([
       {

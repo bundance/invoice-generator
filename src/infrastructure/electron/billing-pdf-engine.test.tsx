@@ -37,7 +37,7 @@ describe("billing PDF engine", () => {
     expect(text).toContain("INVOICE GGIOHK-0043");
     expect(text).toContain("Page 1 of 1");
     expect(text).toContain("Genesis Global");
-    expect(text).toContain("USD 2,900.00");
+    expect(text).toContain("$2,900.00");
     expect(Buffer.from(result.bytes).includes(Buffer.from("Arimo"))).toBe(true);
     expect(pages).toEqual([
       expect.objectContaining({ hasImage: true, textLength: expect.any(Number) }),
@@ -158,10 +158,10 @@ describe("billing PDF engine", () => {
     );
 
     expect((await readPdfText(invoice.bytes)).replaceAll(/\s+/gu, " ")).toContain(
-      "Sterling net GBP 2,320.00 Sterling VAT GBP 464.00 Sterling total GBP 2,784.00",
+      "Sterling net £2,320.00 Sterling VAT £464.00 Sterling total £2,784.00",
     );
     expect((await readPdfText(credit.bytes)).replaceAll(/\s+/gu, " ")).toContain(
-      "Sterling net GBP -2,320.00 Sterling VAT GBP -464.00 Sterling total GBP -2,784.00",
+      "Sterling net -£2,320.00 Sterling VAT -£464.00 Sterling total -£2,784.00",
     );
   });
 
@@ -242,6 +242,9 @@ describe("billing PDF engine", () => {
       draft: {
         ...completeForeignCurrencyVatInvoiceDraftInput,
         exchange: { ...completeForeignCurrencyVatInvoiceDraftInput.exchange, rate: "0.00000001" },
+        serviceLines: [
+          { ...completeForeignCurrencyVatInvoiceDraftInput.serviceLines[0], dayRate: "725000" },
+        ],
       },
       issuer: completeIssuer,
       today: parseBusinessDate("2026-09-06"),
